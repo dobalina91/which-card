@@ -1,0 +1,87 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="robots" content="noindex, nofollow">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Which Card">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="theme-color" content="#eef1f4" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#0c1015" media="(prefers-color-scheme: dark)">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="apple-touch-icon" href="icon-180.png">
+<link rel="icon" href="icon-192.png">
+<style>:root{color-scheme:light;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}body{margin:0;font:14px system-ui,sans-serif}img{max-width:100%}[hidden]{display:none!important}</style>
+<title>Which Card?</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,700;12..96,800&family=IBM+Plex+Mono:wght@400;500&family=Instrument+Sans:wght@400;500;600;700&display=swap">
+<link rel="stylesheet" href="app.css">
+</head>
+<body>
+<div class="app">
+  <header class="top">
+    <div class="brand"><span class="brand-mark" aria-hidden="true"></span>Which Card?</div>
+    <div class="seg" role="group" aria-label="Who is paying">
+      <button type="button" data-who="a" aria-pressed="true"></button>
+      <button type="button" data-who="b" aria-pressed="false"></button>
+    </div>
+    <button type="button" class="icon-btn" data-act="settings" aria-label="Cards and settings">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></svg>
+    </button>
+  </header>
+  <div id="banner"></div>
+  <main>
+    <section id="tab-ask" class="tab" aria-label="Which card">
+      <form id="askForm" class="ask" autocomplete="off">
+        <label for="q" class="ask-label">Where are you paying?</label>
+        <div class="field">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
+          <input id="q" type="search" placeholder="DS Groceries, PARKnSHOP, Agoda…" enterkeyhint="search" autocapitalize="off" autocorrect="off" spellcheck="false">
+          <button type="button" class="clear" id="qClear" aria-label="Clear the search" hidden>×</button>
+        </div>
+        <div class="ask-row">
+          <label class="amt" for="amt"><span>HK$</span><input id="amt" inputmode="decimal" enterkeyhint="done" placeholder="Amount, optional"></label>
+          <button type="button" class="toggle" id="abroadBtn" aria-pressed="false">Abroad</button>
+          <select id="country" aria-label="Country" hidden></select>
+        </div>
+      </form>
+      <div id="askBody" class="tab-body"></div>
+    </section>
+    <section id="tab-status" class="tab" aria-label="Status" hidden></section>
+    <section id="tab-spend" class="tab" aria-label="Spending" hidden></section>
+  </main>
+</div>
+<button type="button" class="add-btn" id="addBtn" data-act="add" hidden>Add expense</button>
+<nav class="tabbar" aria-label="Sections">
+  <div class="tabbar-in">
+    <button type="button" data-tab="ask" aria-current="page">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round" aria-hidden="true"><rect x="2.5" y="5" width="19" height="14" rx="2.5"/><path d="M2.5 10h19M6 15h4"/></svg>
+      <span>Which card</span>
+    </button>
+    <button type="button" data-tab="status">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><path d="M4 19h16M7 15V9M12 15V5M17 15v-3"/></svg>
+      <span>Status</span><span class="badge" id="badge" hidden></span>
+    </button>
+    <button type="button" data-tab="spend">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round" aria-hidden="true"><path d="M6 3h12v18l-3-2-3 2-3-2-3 2z"/><path d="M9 8h6M9 12h6" stroke-linecap="round"/></svg>
+      <span>Spending</span>
+    </button>
+  </div>
+</nav>
+<div id="sheet" class="sheet" hidden>
+  <button type="button" class="sheet-backdrop" data-act="close-sheet" aria-label="Close" tabindex="-1"></button>
+  <div class="sheet-panel" role="dialog" aria-modal="true" aria-labelledby="sheetTitle">
+    <div class="sheet-head"><h2 id="sheetTitle">&nbsp;</h2><button type="button" class="icon-btn" data-act="close-sheet" aria-label="Close">×</button></div>
+    <div id="sheetBody"></div>
+  </div>
+</div>
+<div id="toast" class="toast" role="status" aria-live="polite" hidden></div>
+<script src="config.js"></script>
+<script src="engine.js"></script>
+<script src="app.js"></script>
+<script>if ("serviceWorker" in navigator) window.addEventListener("load", function () { navigator.serviceWorker.register("sw.js").catch(function () {}); });</script>
+</body>
+</html>
