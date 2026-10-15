@@ -305,6 +305,12 @@ a.btn { display: inline-block; text-decoration: none; }
 .step .cp-img.portrait { height: min(130px, 34vw); }
 .step .cp-rate { font-size: 30px; }
 .uses { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
+.trip-kind { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; font-size: 14px; }
+.trip-kind .chip[aria-pressed="true"] { background: var(--ink); color: var(--bg); border-color: var(--ink); }
+.tx-back { font: 600 12.5px/1.2 var(--f-data); font-variant-numeric: tabular-nums; }
+.tx-back.pos { color: var(--good); }
+.tx-back.neg { color: var(--bad); }
+.together { margin-top: -4px; }
 .uses li { padding-left: 12px; border-left: 3px solid var(--good); }
 .step-h { margin: 0; font-weight: 700; }
 .backup { margin: 0; font-size: 13.5px; color: var(--muted); display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }

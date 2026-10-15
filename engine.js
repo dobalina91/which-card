@@ -300,10 +300,11 @@
   // HeyMax shopping portal, Hong Kong (rates as listed in the app on 14 Oct 2026): `per` = HK$ spent for 1 Max Mile;
   // `fixed` = flat Max Miles. Start from the HeyMax app (or its link) before paying, or nothing is tracked.
   const HEYMAX = {
-    "Trip.com": { k: "tripcom", per: 3, note: "Flights give much less: about HK$0.70 back per HK$100 of the fare before taxes." },
+    // Trip.com flights earn on the fare before taxes, not on what is paid: about 1 Max Mile per HK$37.6 paid (Oct 2026).
+    "Trip.com": { k: "tripcom", per: 3, flightPer: 37.6 },
     "Klook": { k: "klook", per: 0.8 },
     "Agoda": { k: "agoda", per: 2.7 },
-    "Expedia": { k: "expedia", per: 4 },
+    "Expedia": { k: "expedia", per: 4, flightPer: null },
     "iHerb": { k: "iherb", per: 16 },
     "Uber": { k: "uber", fixed: 200, note: "New Uber users only." },
     "Taobao / Tmall (AlipayHK)": { k: "taobao", per: 4 },
@@ -965,9 +966,22 @@
     const windows = welcomeWindows(cfg);
     const st = newState();
     const byId = {};
+    const mileRate = Number(cfg.miles && cfg.miles.rate) || 0.12;
+    let rentN = 0;
     for (const t of sortTxns(txns || [])) {
       const cat = CATS[t.category];
       const def = CARDS[t.card];
+      // Max Miles that come with the purchase, at their FlyAnywhere value: tracked through HeyMax (heymaxMiles),
+      // or the rent's miles from Rently. Asia Miles and other airline miles are not counted.
+      let miles = Number(t.heymaxMiles) || 0;
+      if (t.category === "rent" && t.card === "fps") {
+        miles += Number(t.miles) || (rentN < cfg.rently.promoPayments ? cfg.rently.promoMiles : cfg.rently.standardMiles);
+        rentN++;
+      }
+      const milesBack = miles * mileRate;
+      if (!(cat && def && t.payer && ["easy", "red", "citi", "hs"].includes(def.kind))) {
+        byId[t.id] = { earned: 0, rewards: 0, fees: 0, miles: milesBack, back: milesBack, net: 0, best: t.card, bestNet: 0, loss: 0, flagged: false, why: "", mode: "best" };
+      }
       if (cat && def && t.payer && ["easy", "red", "citi", "hs"].includes(def.kind)) {
         const rec = recommend({ payer: t.payer, date: t.date, catId: t.category, amount: t.amount, flags: t.flags || {} }, st, cfg);
         const actual = rateFor(t.card, t.category, { payer: t.payer, date: t.date, amount: Number(t.amount) || 0, flags: t.flags || {}, cfg, st, assumeHs: rec ? rec.assumeHs : false });
@@ -988,8 +1002,9 @@
               : cardLabel(best) + " would have earned " + pct(rec.pick.net) + " instead of " + pct(actual.net);
           }
         }
-        // earned = net of fees; rewards and fees separately, for the Spending totals.
-        byId[t.id] = { earned: actual.net * amount, rewards: actual.rebate * amount, fees: actual.fee * amount, net: actual.net, best, bestNet: rec ? rec.pick.net : actual.net, loss, flagged, why, mode: rec ? rec.mode : "best" };
+        // earned = net of fees; rewards and fees separately, for the Spending totals; back = what comes back in HK$.
+        byId[t.id] = { earned: actual.net * amount, rewards: actual.rebate * amount, fees: actual.fee * amount, miles: milesBack, back: actual.net * amount + milesBack,
+          net: actual.net, best, bestNet: rec ? rec.pick.net : actual.net, loss, flagged, why, mode: rec ? rec.mode : "best" };
       }
       applyTxn(st, t, cfg, windows);
     }
@@ -1119,8 +1134,8 @@
     }
     for (const f of flights) {
       if (f.claimed || f.daysLeft < 0) continue;
-      if (f.canClaim && f.daysLeft <= 7) alerts.push({ level: f.daysLeft <= 3 ? "bad" : "warn", kind: "flight", id: f.id, text: "Pay back " + (f.merchant || "a flight") + " with Max Miles by " + dayLabel(f.deadline), sub: "FlyAnywhere: " + countLabel(f.needed) + " Max Miles for the whole ticket, " + countLabel(balance) + " available. HK$" + cfg.miles.rate.toFixed(2) + " a mile, paid by FPS." });
-      else if (f.claimFrom) alerts.push({ level: "info", kind: "flight", id: f.id, text: (f.merchant || "A flight") + ": Max Miles can pay it back from " + dayLabel(f.claimFrom), sub: "Once the rent's Max Miles land. Claim in FlyAnywhere between " + dayLabel(f.claimFrom) + " and " + dayLabel(f.deadline) + "." });
+      if (f.canClaim && f.daysLeft <= 7) alerts.push({ level: f.daysLeft <= 3 ? "bad" : "warn", kind: "flight", id: f.id, text: "HeyMax can pay back " + (f.merchant || "a flight") + ": claim by " + dayLabel(f.deadline), sub: "In the HeyMax app, FlyAnywhere pays the whole ticket (" + hkd(f.amount) + ") back by FPS, with " + countLabel(f.needed) + " of your " + countLabel(balance) + " Max Miles." });
+      else if (f.claimFrom) alerts.push({ level: "info", kind: "flight", id: f.id, text: (f.merchant || "A flight") + ": HeyMax can pay it back from " + dayLabel(f.claimFrom), sub: "Once the rent's Max Miles land. Claim in FlyAnywhere between " + dayLabel(f.claimFrom) + " and " + dayLabel(f.deadline) + "." });
     }
     for (const mt of meters) {
       if (mt.key.startsWith("wel_") && mt.state === "warn") alerts.push({ level: "warn", kind: "welcome", text: "Behind on the " + cardLabel(mt.card) + " welcome bonus", sub: mt.detail });
