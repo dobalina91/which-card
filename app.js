@@ -19,6 +19,10 @@
   };
   const parseAmt = (s) => { const n = parseFloat(String(s == null ? "" : s).replace(/,/g, "").replace(/[^0-9.]/g, "")); return isFinite(n) && n > 0 ? Math.round(n * 100) / 100 : 0; };
   const tone = (id) => "t-" + ((E.CARDS[id] || {}).tone || "debit");
+  // Money as people say it: HK$120, HK$3.20, HK$2.40 (no percentages on the Which card tab).
+  const money = (v) => { const a = Math.abs(v); return (v < 0 ? "−" : "") + "HK$" + (a >= 10 || Number.isInteger(Math.round(a * 100) / 100) ? Math.round(a).toLocaleString("en-US") : a.toFixed(2)); };
+  // What a net rate gives back: on the amount typed, or per HK$100 when there is none.
+  const backOf = (net, amount) => (amount ? net * amount : net * 100);
   const SHORT = { red: "Red", easy: "easy", citi: "Citi", hs: "Hang Seng", debit: "Citi PLUS", cash: "Cash", fps: "FPS" };
   const shortCard = (id) => SHORT[(E.CARDS[id] || {}).kind] || id;
   // Names come from the private settings (the store, or the solo page's sealed block); the public code has none.
@@ -109,7 +113,8 @@
   /* ---------- top-level render ---------- */
   function refresh() {
     S.status = E.status(S.txns, S.cfg, S.today);
-    S.pointRows = SOLO ? [] : E.pointsSummary(S.points, S.today);
+    // The solo page has the balances its extras carry (the ones that person can use); the main page has the store's.
+    S.pointRows = SOLO ? E.pointsSummary(S.priv.points || [], S.today).filter((r) => r.users.includes(S.who)) : E.pointsSummary(S.points, S.today);
     if (SOLO) {
       // The solo page sees no spending: a welcome bonus already reached is marked done at build time.
       for (const id of EMBED.welcomeDone || []) S.status.state.wel[id] = Number.MAX_SAFE_INTEGER;
@@ -215,15 +220,15 @@
     if (d.mode === "hsmonth") {
       const t = S.cfg.travelPlus.monthTarget;
       const so = st.hsMonth(d.id, E.ym(S.today)).spend;
-      return "Hang Seng month: " + E.hkd(t) + " on it this month unlocks 5% at restaurants" + (SOLO ? "." : " (" + E.hkd(so) + " so far).");
+      return "Hang Seng month: " + E.hkd(t) + " on it this month unlocks HK$5 back per HK$100 at restaurants" + (SOLO ? "." : " (" + E.hkd(so) + " so far).");
     }
     if (c.kind === "easy") {
       const rh = (S.cfg.redHot[c.holder] || {}).cat;
-      return "A Visa, so the tram costs HK$2.30." + (rh && RH_WHERE[rh] ? " 2.4% at " + RH_WHERE[rh] + "." : "") + " 0.4% elsewhere, like the other cards.";
+      return "A Visa, so the tram costs HK$2.30. Back per HK$100: " + (rh && RH_WHERE[rh] ? "HK$2.40 at " + RH_WHERE[rh] + ", " : "") + "HK$0.40 elsewhere, like the other cards.";
     }
-    if (c.kind === "citi") return "1% on everything, 2% at restaurants and hotels, no extra fees.";
-    if (c.kind === "hs") return "Basic 0.4% +FUN Dollars, more at restaurants in promo months.";
-    if (c.kind === "red") return "4% online and 8% at Red partners, 0.4% elsewhere.";
+    if (c.kind === "citi") return "Back per HK$100: HK$1 on everything, HK$2 at restaurants and hotels. No extra fees.";
+    if (c.kind === "hs") return "HK$0.40 back per HK$100 in +FUN Dollars, more at restaurants in promo months.";
+    if (c.kind === "red") return "Back per HK$100: HK$4 online, HK$8 at Red partners, HK$0.40 elsewhere.";
     return "";
   }
   function defaultHtml() {
@@ -242,7 +247,7 @@
       g.items.push(x);
     }
     const xs = groups.map((g) => cardPill(g.card, shortCard(g.card)) + "<span>" + g.items.map((x) =>
-      esc(x.label) + ' <b class="mono">' + esc(x.fare != null ? "HK$" + x.fare.toFixed(2) : E.pct(x.net)) + "</b>").join('<span class="dc-sep"> · </span>') + "</span>").join("");
+      esc(x.label) + ' <b class="mono">' + esc(x.fare != null ? "HK$" + x.fare.toFixed(2) : money(x.net * 100)) + "</b>").join('<span class="dc-sep"> · </span>') + "</span>").join("");
     let foot = "";
     if (d.next) foot = "From " + E.dayLabel(d.next.from) + ": " + cardName(d.next.id) + (d.next.mode === "welcome" ? ", for its welcome bonus" : (d.next.mode === "hsmonth" ? ", for the Hang Seng month" : "")) + ". Change the default that day.";
     else if (d.coming) foot = "When the " + cardName(d.coming.id) + " arrives, it becomes the default" + (d.coming.mode === "welcome" ? " for its welcome bonus" : "") + ".";
@@ -250,7 +255,7 @@
       '<div class="dc">' +
         '<div class="dc-main">' + art + '<div class="dc-info"><span class="dc-name">' + esc(cardName(d.id)) + '</span><span class="dc-reason">' + esc(defaultReason(d)) + "</span>" +
         '<span class="dc-wallet">Set it as the default card in ' + esc(walletOf(S.who)) + ".</span></div></div>" +
-        (xs ? '<div class="dc-xs"><span class="dc-x-h">Use another card for</span><div class="dc-xl">' + xs + "</div></div>" : "") +
+        (xs ? '<div class="dc-xs"><span class="dc-x-h">Use another card for (back per HK$100)</span><div class="dc-xl">' + xs + "</div></div>" : "") +
         (foot ? '<p class="dc-foot">' + esc(foot) + "</p>" : "") +
       "</div>";
   }
@@ -262,14 +267,14 @@
     const rows = list.map((q, i) => {
       const r = E.recommend({ payer: S.who, date: S.today, catId: q.cat, amount, flags: q.flags || {} }, S.status.state, S.cfg);
       if (!r) return "";
-      return '<button type="button" class="quick-row" data-quick="' + i + '"><span class="q-label">' + esc(q.label) + "</span>" + cardPill(r.pick.id, shortCard(r.pick.id)) + '<span class="q-rate">' + esc(r.pick.fare != null ? "HK$" + r.pick.fare.toFixed(2) : (r.pick.id === "cash" ? "cash" : E.pct(r.pick.net))) + "</span></button>";
+      return '<button type="button" class="quick-row" data-quick="' + i + '"><span class="q-label">' + esc(q.label) + "</span>" + cardPill(r.pick.id, shortCard(r.pick.id)) + '<span class="q-rate">' + esc(r.pick.fare != null ? "HK$" + r.pick.fare.toFixed(2) : (r.pick.id === "cash" ? "cash" : money(backOf(r.pick.net, amount)))) + "</span></button>";
     }).join("");
     return defaultHtml() +
-      '<div class="section-h"><span>Right now' + esc(forWho(" for ")) + (S.ask.abroad ? " in " + esc(countryLabel()) : "") + '</span><span class="mono">' + esc(E.dayLabel(S.today)) + "</span></div>" +
+      '<div class="section-h"><span>Right now' + esc(forWho(" for ")) + (S.ask.abroad ? " in " + esc(countryLabel()) : "") + '</span><span class="mono">' + esc(amount ? "back on " + E.hkd(amount) : "back per HK$100") + "</span></div>" +
       '<div class="quick">' + rows + "</div>" +
       (SOLO
-        ? '<p class="hint">Type the shop, restaurant or website above for a precise answer. Rates are after fees. Not sure? Tap ' + esc(askLabel()) + " on the answer.</p>"
-        : '<p class="hint">Type a shop, restaurant or website above for a precise answer. Rates are after fees. Tap a line for the reasons.</p>');
+        ? '<p class="hint">Type the shop, restaurant or website above for a precise answer, and the amount for the HK$ back. After fees. Not sure? Tap ' + esc(askLabel()) + " on the answer.</p>"
+        : '<p class="hint">Type a shop, restaurant or website above for a precise answer, and the amount for the HK$ back. After fees.</p>');
   }
 
   function suggestionsHtml(matches, sel) {
@@ -292,15 +297,16 @@
       claude + (A.claude.msg ? '<p class="callout warn">' + esc(A.claude.msg) + "</p>" : "") + "</div>";
   }
 
-  function cardFace(id, payer, rate, back) {
+  // The card to pull out, with what it gives back in HK$ (big) and a word on it (small).
+  function cardFace(id, payer, big, small) {
     const c = E.CARDS[id];
     let holder = "";
     if (c.kind === "cash") holder = "local currency";
     else if (c.holder === payer) holder = SOLO ? "" : nameOf(payer);
     else if (c.supp === payer) holder = SOLO || !nameOf(payer) ? "extra card" : nameOf(payer) + " · extra card";
     else if (c.holder) holder = nameOf(c.holder);
-    const isFare = /^HK\$/.test(rate);
-    const rateHtml = isFare ? "<small>HK$</small>" + esc(rate.slice(3)) : esc(rate).replace("%", "<small>%</small>");
+    const m = /^(−?)HK\$(.*)$/.exec(big);
+    const bigHtml = m ? esc(m[1]) + "<small>HK$</small>" + esc(m[2]) : esc(big);
     const img = cardImg(id);
     const art = img
       ? '<img class="cp-img ' + img.shape + '" src="' + img.src + '" alt="' + esc(cardLabel(id)) + ' card" width="' + img.w + '" height="' + img.h + '">'
@@ -308,9 +314,19 @@
         (c.kind === "cash" ? "<span></span>" : '<span class="cf-chip"></span>') + '<span class="cp-mini-name">' + esc(c.name) + "</span></div>";
     const label = (c.kind === "cash" ? "Cash" : E.cardName(id)) + (holder ? " · " + holder : "");
     return '<div class="cardpic">' + art +
-      '<div class="cp-info"><span class="cp-label">' + esc(label) + '</span><span class="cp-rate' + (isFare ? " fare" : "") + '">' + rateHtml + '</span><span class="cp-back">' + esc(back) + "</span></div></div>";
+      '<div class="cp-info"><span class="cp-label">' + esc(label) + '</span><span class="cp-rate fare">' + bigHtml + '</span><span class="cp-back">' + esc(small) + "</span></div></div>";
+  }
+  // A card's result in words: [big, small], e.g. ["HK$120", "back"], ["HK$4", "back per HK$100"], ["HK$2.30", "a ride"].
+  function cardBack(o, cat, amount) {
+    if (o.fare != null) return ["HK$" + o.fare.toFixed(2), o.fare < cat.fare ? "a ride, instead of HK$" + cat.fare.toFixed(2) : "a ride, full fare"];
+    if (o.id === "cash") return ["Cash", "no card fees"];
+    const v = backOf(o.net, amount);
+    const per = amount ? "" : " per HK$100";
+    if (Math.abs(v) < 0.005) return ["HK$0", "back" + per];
+    return v > 0 ? [money(v), "back" + per] : [money(v), "net cost" + per + ": the fees are bigger than the rewards"];
   }
 
+  // The answer, in the order to act: points or miles to use, the HeyMax link, then the card.
   function resultHtml(sel) {
     const A = S.ask;
     const catId = effectiveCat(sel);
@@ -318,26 +334,54 @@
     const rec = E.recommend({ payer: S.who, date: S.today, catId, amount, flags: askFlags(sel) }, S.status.state, S.cfg);
     if (!rec) return '<p class="empty">No card is available' + esc(forWho(" for ")) + " here.</p>";
     const p = rec.pick;
-    let back;
     const cat = E.CATS[catId];
-    if (p.fare != null) back = p.fare < cat.fare ? "instead of HK$" + cat.fare.toFixed(2) : "full fare";
-    else if (p.id === "cash") back = "no card fees";
-    else if (amount) { const v = p.net * amount; back = v >= 0 ? "≈ " + E.hkd(v, v < 20 ? 1 : 0) + " back" : "≈ " + E.hkd(-v, 1) + " net cost"; }
-    else back = p.net >= 0 ? E.hkd(p.net * 100, 1) + " per HK$100" : E.hkd(-p.net * 100, 1) + " net cost per HK$100";
     const mode = rec.mode === "welcome" ? '<span class="mode-tag">Welcome bonus first</span>' : (rec.mode === "hsmonth" ? '<span class="mode-tag hs">Hang Seng month</span>' : "");
-    const src = (sel.label ? sel.label + " · " : "") + E.CATS[catId].label + (sel.source === "claude" ? " · identified by Claude" : (sel.source === "user" ? " · saved in your list" : ""));
+    const src = (sel.label ? sel.label + " · " : "") + cat.label + (sel.source === "claude" ? " · identified by Claude" : (sel.source === "user" ? " · saved in your list" : ""));
+    // Notes that change what to do stay in view; the rest goes under "Why this card".
     let notes = rec.notes.map((t) => ({ t, hot: /^(Welcome bonus first|You are behind)/.test(t) }));
-    if (sel.source === "claude" && sel.confidence < 0.5) notes.unshift({ t: "Claude isn't sure what this place is. Check the kind of place below if the advice looks wrong.", hot: false });
+    if (sel.source === "claude" && sel.confidence < 0.5) notes.unshift({ t: "Claude isn't sure what this place is. Check the kind of place below if the advice looks wrong.", hot: true });
     if (SOLO) {
       // No spending data here: drop the progress figures and keep the rule.
       notes = notes.filter((n) => !/^(Welcome bonus|You are behind)/.test(n.t));
       const w = rec.welcome;
-      if (w) notes.unshift({ t: "Welcome bonus running: " + cardLabel(w.id) + " needs " + E.hkd(w.target) + " of spending by " + E.dayLabel(w.end) + "." + (rec.mode === "welcome" ? " Use it here." : " Here another card earns clearly more."), hot: rec.mode === "welcome" });
-      if (p.cap && E.CARDS[p.id].kind === "red") notes.push({ t: "Your Red pays this rate on the first " + E.hkd(p.cap.of) + (E.CATS[catId].red8 ? " at its partner shops" : " spent online") + " each month, then 0.4%. Already spent that much this month? Tap " + askLabel() + ".", hot: false });
+      if (w) notes.unshift({ t: "Welcome bonus running: " + cardLabel(w.id) + " needs " + E.hkd(w.target) + " of spending by " + E.dayLabel(w.end) + "." + (rec.mode === "welcome" ? " Use it here." : " Here another card gives clearly more back."), hot: rec.mode === "welcome" });
+      if (p.cap && E.CARDS[p.id].kind === "red") notes.push({ t: "The Red gives this on the first " + E.hkd(p.cap.of) + (cat.red8 ? " at its partner shops" : " spent online") + " each month, then much less. Already spent that much this month? Tap " + askLabel() + ".", hot: true });
     }
     const hasKind = (kind) => Object.keys(E.CARDS).some((id) => E.CARDS[id].kind === kind && E.usableBy(id, S.who, S.cfg, S.today));
     const promos = E.promosFor(sel.name, p.id, S.extraPromos).filter((x) => !x.until || x.until >= S.today);
-    const alts = rec.alts.map((o) => '<div class="alt">' + cardPill(o.id, cardLabel(o.id)) + '<span></span><span class="alt-rate">' + esc(o.fare != null ? "HK$" + o.fare.toFixed(2) : E.pct(o.net)) + '</span><span class="alt-why">' + esc(o.why[0] || "") + "</span></div>").join("");
+    const promoLine = (x) => '<p class="promo"><b>' + (x.tip ? "Tip:" : "Offer:") + "</b> " + esc(x.text) + (x.until ? ' <span class="muted">Until ' + esc(E.dayLabel(x.until)) + ".</span>" : "") + "</p>";
+    const usefulPromos = promos.filter((x) => x.tip || !x.card || hasKind(x.card));
+    const otherPromos = promos.filter((x) => !(x.tip || !x.card || hasKind(x.card)));
+
+    // Steps before the card: what can be used here (one step, each option a line), then HeyMax.
+    const steps = [];
+    const uses = pointsSteps(sel, amount);
+    const fly = flyStep(sel, amount);
+    if (fly) uses.push(fly);
+    if (uses.length === 1) steps.push(uses[0]);
+    else if (uses.length > 1) steps.push('<p class="step-h">Points and miles you can use here</p><ul class="uses">' + uses.map((u) => "<li>" + u + "</li>").join("") + "</ul>");
+    const hm = heymaxStep(sel, amount);
+    if (hm) steps.push(hm.html);
+
+    // The card, and a backup in case it isn't accepted.
+    const [big, small] = cardBack(p, cat, amount);
+    const backup = rec.alts.find((o) => o.id !== "cash" && E.CARDS[o.id] && E.CARDS[o.id].net !== E.CARDS[p.id].net) || rec.alts.find((o) => o.id !== "cash");
+    const bk = backup ? cardBack(backup, cat, amount) : null;
+    const scan = E.programsAt(sel.name).filter((id) => id === "moneyback" || id === "yuu").map((id) => E.PROGRAMS[id].name);
+    const cardStep = (steps.length ? '<p class="step-h">Pay with</p>' : "") +
+      cardFace(p.id, S.who, big, small) +
+      (scan.length ? '<p class="hint">Scan ' + esc(scan.join(" and ")) + " at the till too.</p>" : "") +
+      (backup && p.id !== "cash" ? '<p class="backup">Not accepted? ' + cardPill(backup.id, shortCard(backup.id)) + " " + esc(bk[0] === "Cash" ? "cash" : bk[0] + " " + bk[1].split(":")[0]) + "</p>" : "");
+    const total = amount && hm && hm.value > 0 && p.net > 0 ? '<p class="total">In all: about <b>' + esc(money(hm.value + p.net * amount)) + "</b> back.</p>" : "";
+
+    // Details: the reasons in figures, every card, offers for cards not active yet.
+    const all = [p].concat(rec.alts).map((o) => { const b = cardBack(o, cat, amount); return '<div class="alt">' + cardPill(o.id, cardLabel(o.id)) + '<span></span><span class="alt-rate">' + esc(b[0]) + '</span><span class="alt-why">' + esc(o.why[0] || "") + "</span></div>"; }).join("");
+    const details = '<details class="why-more"><summary>Why this card</summary>' +
+      '<ul class="why">' + p.why.map((w) => "<li>" + esc(w) + "</li>").join("") + "</ul>" +
+      notes.filter((n) => !n.hot).map((n) => '<p class="hint">' + esc(n.t) + "</p>").join("") +
+      otherPromos.map(promoLine).join("") +
+      '<div class="section-h"><span>Every card here</span><span class="mono">' + esc(amount ? "on " + E.hkd(amount) : "per HK$100") + '</span></div><div class="alts">' + all + "</div></details>";
+
     let actions = "";
     if (SOLO) actions = '<div class="actions"><button type="button" class="btn" data-act="ask-help">' + esc(askLabel()) + "</button></div>";
     else if (canWrite()) {
@@ -345,19 +389,15 @@
         ? '<div class="actions"><button type="button" class="btn" data-act="log-other">Log a card payment</button></div>'
         : '<div class="actions"><button type="button" class="btn primary" data-act="log-pick" data-card="' + p.id + '">Paid with ' + esc(shortCard(p.id)) + '</button><button type="button" class="btn" data-act="log-other">Paid another way</button></div>';
     }
+    const hot = notes.filter((n) => n.hot);
     return '<div class="result">' +
       '<div class="result-for"><h2>' + esc(sel.name) + '</h2><span class="muted">' + esc(src) + "</span>" + mode + "</div>" +
-      cardFace(p.id, S.who, p.fare != null ? "HK$" + p.fare.toFixed(2) : (p.id === "cash" ? "0%" : E.pct(p.net)), back) +
-      '<ul class="why">' + p.why.map((w) => "<li>" + esc(w) + "</li>").join("") + "</ul>" +
+      (steps.length ? '<ol class="steps">' + steps.map((h) => '<li class="step">' + h + "</li>").join("") + '<li class="step">' + cardStep + "</li></ol>" : cardStep) +
+      total +
+      (hot.length ? '<ul class="notes">' + hot.map((n) => '<li class="n-hot">' + esc(n.t) + "</li>").join("") + "</ul>" : "") +
       netFeeHtml(sel, catId, amount) +
-      (notes.length ? '<ul class="notes">' + notes.map((n) => "<li" + (n.hot ? ' class="n-hot"' : "") + ">" + esc(n.t) + "</li>").join("") + "</ul>" : "") +
-      promos.map((x) => '<p class="promo"><b>' + (x.tip ? "Tip:" : "Offer:") + "</b> " + esc(x.text) +
-        (x.card && !hasKind(x.card) ? ' <span class="muted">' + (SOLO || !nameOf(S.who) ? "This card isn't active for you yet." : esc(nameOf(S.who)) + " doesn't have this card active yet.") + "</span>" : "") +
-        (x.until ? ' <span class="muted">Until ' + esc(E.dayLabel(x.until)) + ".</span>" : "") + "</p>").join("") +
-      loyaltyHtml(sel) +
-      heymaxHtml(sel, catId) +
-      (alts ? '<div><div class="section-h"><span>Other cards</span></div><div class="alts">' + alts + "</div></div>" : "") +
-      actions +
+      usefulPromos.map(promoLine).join("") +
+      actions + details +
       (sel.source !== "quick" ? fixHtml(sel) : "") +
       '<div><button type="button" class="linkish" data-act="clear-ask">Start again</button></div>' +
       "</div>";
@@ -371,6 +411,7 @@
     const nf = S.ask.netFee;
     const entered = parseAmt(nf.mastercard) > 0 || parseAmt(nf.visa) > 0;
     const flagged = !!(sel.flags && sel.flags.netFees);
+    if (!flagged && !entered) return "";
     const g = E.networkGap({ payer: S.who, date: S.today, catId, amount, flags: sel.flags || {} }, S.status.state, S.cfg);
     let even = "";
     const extra = parseAmt(nf.mastercard) - parseAmt(nf.visa);
@@ -378,12 +419,12 @@
       const room = g.gap * amount;
       even = extra > room
         ? "With these fees the " + shortCard(g.visa) + " (Visa) wins: Mastercard costs " + E.hkd(extra) + " more, and the " + shortCard(g.mc) + " can only make up " + E.hkd(room) + "."
-        : "With these fees the " + shortCard(g.mc) + " still wins: " + (extra > 0 ? "Mastercard costs " + E.hkd(extra) + " more, and the " + shortCard(g.mc) + " makes up to " + E.hkd(room) + " more than the " + shortCard(g.visa) + "." : "the fees don't favour Visa.");
+        : "With these fees the " + shortCard(g.mc) + " still wins: " + (extra > 0 ? "Mastercard costs " + E.hkd(extra) + " more, and the " + shortCard(g.mc) + " gives up to " + E.hkd(room) + " more than the " + shortCard(g.visa) + "." : "the fees don't favour Visa.");
     } else if (g && g.gap > 0) {
-      even = "The " + shortCard(g.mc) + " stays the better card unless the site charges Mastercard more than " + E.pct(g.gap) + " extra" + (amount ? " (" + E.hkd(g.gap * amount) + " on " + E.hkd(amount) + ")" : "") + " compared with Visa.";
+      even = "The " + shortCard(g.mc) + " stays the better card unless the site charges Mastercard more than " + (amount ? E.hkd(g.gap * amount) + " extra on " + E.hkd(amount) : money(g.gap * 100) + " extra per HK$100") + ", compared with Visa.";
     } else if (g) even = "The " + shortCard(g.visa) + " (Visa) is already the better card here.";
-    return '<details class="netfee"' + (flagged || entered ? " open" : "") + "><summary>" + (flagged ? "Card fee at checkout" : "Different fee for Mastercard and Visa?") + "</summary>" +
-      '<p class="hint">' + (flagged ? "This site often adds a fee that depends on the card, usually more for Mastercard. Enter the fees its payment page shows." : "If the payment page shows a different fee for each card, enter them here.") + "</p>" +
+    return '<details class="netfee" open><summary>Card fee at checkout</summary>' +
+      '<p class="hint">This site often adds a fee that depends on the card, usually more for Mastercard. Enter the fees its payment page shows.</p>' +
       '<div class="form nf-form"><div class="two"><label for="nf-mc">Mastercard fee (HK$)<input id="nf-mc" inputmode="decimal" enterkeyhint="done" placeholder="0" value="' + esc(nf.mastercard) + '"></label>' +
       '<label for="nf-visa">Visa fee (HK$)<input id="nf-visa" inputmode="decimal" enterkeyhint="done" placeholder="0" value="' + esc(nf.visa) + '"></label></div></div>' +
       (entered && !amount ? '<p class="hint">Add the amount at the top to compare the cards with these fees.</p>' : "") +
@@ -607,8 +648,9 @@
   function flightState(f) {
     if (f.claimed) return "Max Miles claimed" + (f.claimedMiles ? ": " + f.claimedMiles.toLocaleString("en-US") : "");
     if (f.daysLeft < 0) return "Claim window closed";
-    if (!f.canClaim) return "FlyAnywhere needs " + fmtCount(f.needed) + " Max Miles for the whole ticket (" + fmtCount(S.status.miles.balance) + " available), by " + E.dayLabel(f.deadline);
-    return "Claim Max Miles by " + E.dayLabel(f.deadline) + " (" + f.daysLeft + (f.daysLeft === 1 ? " day)" : " days)");
+    if (f.claimFrom) return "Max Miles can pay it back once the rent's miles land: claim between " + E.dayLabel(f.claimFrom) + " and " + E.dayLabel(f.deadline);
+    if (!f.canClaim) return "Too dear for FlyAnywhere: Max Miles cover a ticket up to " + money(S.status.miles.balance * S.cfg.miles.rate) + " now, and must pay all of it";
+    return "Max Miles can pay it back: claim in FlyAnywhere by " + E.dayLabel(f.deadline) + " (" + f.daysLeft + (f.daysLeft === 1 ? " day)" : " days)");
   }
   function renderStatus() {
     if (!S.status) return;
@@ -965,10 +1007,11 @@
     return JSON.parse(new TextDecoder().decode(plain));
   }
   function applySealed(data) {
-    S.priv = { people: (data && data.people) || {}, ask: (data && data.ask) || {}, links: (data && data.links) || {} };
+    S.priv = { people: (data && data.people) || {}, ask: (data && data.ask) || {}, links: (data && data.links) || {},
+      points: (data && data.points) || [], miles: (data && data.miles) || null };
     S.sealed = "open";
     soloHeader();
-    renderAskBody();
+    refresh();
   }
   async function unlockWith(code) {
     const sd = EMBED && EMBED.sealed;
@@ -1008,62 +1051,84 @@
   function pointAlerts() {
     return E.pointsAlerts(S.pointRows, 30).map((a) => Object.assign({}, a, { sub: [nameOf(a.owner), a.sub].filter(Boolean).join(" · ") }));
   }
-  function balanceText(r) {
-    const amount = r.unit === "HK$" ? E.hkd(r.balance, 2) : fmtCount(r.balance) + " " + (r.kind === "miles" ? "miles" : "points");
-    return amount + (r.value != null && r.unit !== "HK$" && r.kind === "shop" ? ", worth " + E.hkd(r.value, r.value < 10 ? 1 : 0) : "");
+  // Points and miles worth using at this place, before the card: only balances big enough to use, and only the
+  // payer's own (or shared) ones. Each step is HTML for one line of the answer.
+  function pointsSteps(sel, amount) {
+    if (!sel || sel.source === "quick") return [];
+    return E.pointsToUse(sel.name, S.pointRows, S.who).map((r) => {
+      const prog = E.PROGRAMS[r.program];
+      const whose = r.owner !== S.who && nameOf(r.owner) ? nameOf(r.owner) + "'s " : "your ";
+      const use = (prog.atUse && prog.atUse[sel.name]) || r.use;
+      const soon = r.next && r.next.daysLeft <= 60 ? " " + E.runLabel(r, r.next) + E.runVerb(r, r.next) + E.dayLabel(r.next.on) + "." : "";
+      const head = "Use " + whose + (prog.useName || prog.name) + ":";
+      if (prog.kind === "shop") {
+        const avail = r.unit === "HK$" ? r.value : Math.floor(r.value);
+        const off = amount ? Math.min(avail, amount) : avail;
+        return "<b>" + esc(head) + "</b> " + esc((amount && avail > amount ? "" : "up to ") + money(off) + " off. " + use + soon);
+      }
+      return "<b>" + esc(head) + "</b> " + esc("worth about " + money(r.value) + ". " + use + soon);
+    });
   }
-  // At a shop with a points programme: scan the app, what the balance is worth, and what to use before it runs out.
-  function loyaltyHtml(sel) {
-    if (!sel || sel.source === "quick") return "";
-    return E.programsAt(sel.name).map((id) => {
-      const P = E.PROGRAMS[id];
-      if (SOLO) return '<p class="promo"><b>' + esc(P.name) + ":</b> scan the app at the till, its points come on top of the card.</p>";
-      const rows = S.pointRows.filter((r) => r.program === id).sort((x, y) => (x.owner === S.who ? -1 : 0) - (y.owner === S.who ? -1 : 0));
-      if (!rows.length) return '<p class="promo"><b>' + esc(P.name) + ":</b> scan the app at the till.</p>";
-      return rows.map((r) => {
-        const soon = r.runs.filter((x) => x.daysLeft <= 60);
-        const later = r.runs.find((x) => x.daysLeft > 60);
-        const whose = r.owner !== S.who && nameOf(r.owner) ? nameOf(r.owner) + "'s " : "";
-        return '<p class="promo' + (soon.length ? " hot" : "") + '"><b>' + esc(P.name) + ":</b> scan " + esc(whose || "the ") + "app. " + esc(balanceText(r)) + "." +
-          soon.map((x) => " <b>Use " + (x.voucher || r.unit === "HK$" ? "it" : "them") + " here:</b> " + esc(E.runLabel(r, x) + E.runVerb(r, x) + E.dayLabel(x.on)) + ".").join("") +
-          (later && !soon.length ? ' <span class="muted">' + esc(E.runLabel(r, later)) + (later.voucher ? " until " : " valid until ") + esc(E.dayLabel(later.on) + " " + later.on.slice(0, 4)) + ".</span>" : "") +
-          "</p>";
-      }).join("");
-    }).join("");
+  // Max Miles (HeyMax) pay a whole flight back within 31 days: suggested on flights they can cover.
+  function maxMiles() {
+    if (SOLO) return S.priv.miles && S.priv.miles.balance != null ? { balance: Number(S.priv.miles.balance) || 0, payments: Number(S.priv.miles.rentPayments) || 0 } : null;
+    return { balance: S.status.miles.balance, payments: S.status.rently.payments };
   }
-  // On HeyMax's shopping list: Max Miles on top of the card, if the purchase starts from HeyMax (its app, or the link).
-  function heymaxHtml(sel, catId) {
+  const MAYBE_FLIGHT = ["Trip.com", "Expedia"];
+  function flyStep(sel, amount) {
+    const flight = sel && sel.flags && sel.flags.flight;
+    if (!flight && !(sel && MAYBE_FLIGHT.includes(sel.name))) return "";
+    const mm = maxMiles();
+    if (!mm || mm.balance < 1000) return "";
+    const fa = E.flyAnywhere(S.today, amount, mm.balance, S.cfg, mm.payments);
+    const who = SOLO ? (nameOf("a") ? nameOf("a") + "'s" : "The") : "Your";
+    const claim = SOLO ? "then ask " + (nameOf("a") || "the account holder") + " to claim it in HeyMax FlyAnywhere" : "then claim it in HeyMax FlyAnywhere";
+    const lead = flight ? "" : "If it's a flight: ";
+    if (amount && fa.now) return "<b>" + esc(lead + "Max Miles pay this ticket back:") + "</b> " + esc(money(amount) + " back. Pay with the card below, " + claim + " by " + E.dayLabel(fa.deadline) + ".");
+    if (amount && fa.claimFrom) return "<b>" + esc(lead + "Max Miles can pay this ticket back") + "</b> " + esc("once the rent's miles land on " + E.dayLabel(fa.claimFrom) + ": " + money(amount) + " back. Pay with the card below, " + claim + " between " + E.dayLabel(fa.claimFrom) + " and " + E.dayLabel(fa.deadline) + ".");
+    if (!amount) return "<b>" + esc(lead + who + " Max Miles pay back a ticket up to " + money(fa.coverNow) + ".") + "</b> " + esc("Pay with the card below, " + claim + " within 31 days. Add the amount to check this one.");
+    return "";
+  }
+  // On HeyMax's shopping list: HK$ back on top of the card, if the purchase starts from HeyMax (its app, or the link).
+  function heymaxStep(sel, amount) {
     const h = sel && E.heymaxFor(sel.name);
-    if (!h) return "";
+    if (!h) return null;
     const link = /^https:\/\//.test(S.priv.links[h.k] || "") ? S.priv.links[h.k] : "";
-    if (SOLO && !link) return "";
+    if (SOLO && !link) return null;
     const rate = S.cfg.miles.rate || 0.12;
-    const amount = parseAmt(S.ask.amount);
-    const earn = h.fixed ? fmtCount(h.fixed) + " Max Miles" : "1 Max Mile per " + E.hkd(h.per, h.per % 1 ? 1 : 0) + ", about " + E.pct(rate / h.per) + " back";
-    const est = !h.fixed && amount ? " Here: about " + fmtCount(amount / h.per) + " Max Miles (" + E.hkd(amount / h.per * rate) + ")." : "";
+    const value = h.fixed ? h.fixed * rate : (amount ? amount / h.per * rate : 0);
+    const what = h.fixed ? money(h.fixed * rate) + " back" : (amount ? "about " + money(value) + " back" : money(100 / h.per * rate) + " back per HK$100");
     const owner = nameOf("a");
     const how = SOLO
-      ? "Open " + sel.name + " with the button below before paying, and finish in the browser page it opens (not in the " + sel.name + " app)." + (owner ? " The Max Miles go to " + owner + "'s HeyMax." : "")
+      ? "Use the button, then pay in the page it opens (not in the " + sel.name + " app)." + (owner ? " It goes to " + owner + "'s HeyMax." : "")
       : "Start from the HeyMax app before paying, or nothing is tracked.";
-    return '<div class="promo heymax"><p><b>HeyMax:</b> ' + esc(earn) + ", on top of the card." + esc(est) + " " + esc(how) + (h.note ? " " + esc(h.note) : "") + "</p>" +
-      (link ? '<p><a class="btn small" href="' + esc(link) + '" target="_blank" rel="noopener noreferrer">Open ' + esc(sel.name) + " via HeyMax</a></p>" : "") + "</div>";
+    const html = "<b>" + esc("Open " + sel.name + " through HeyMax:") + "</b> " + esc(what + ", on top of the card. " + how + (h.note ? " " + h.note : "")) +
+      (link ? '<div><a class="btn small" href="' + esc(link) + '" target="_blank" rel="noopener noreferrer">Open ' + esc(sel.name) + " via HeyMax</a></div>" : "");
+    return { html, value };
   }
-  // Status: balances of the points and miles programmes, soonest expiry first.
+  // Status: each balance with its HK$ value, green when it can be used, red with what is missing, grey when unknown.
   function pointsHtml() {
     const rows = S.pointRows;
     if (!rows.length) return "";
     const line = (r) => {
       const x = r.next;
-      const when = x ? E.runLabel(r, x) + E.runVerb(r, x) + E.dayLabel(x.on) + (x.on.slice(0, 4) !== S.today.slice(0, 4) ? " " + x.on.slice(0, 4) : "") : "No expiry noted";
+      const when = x ? E.runLabel(r, x) + E.runVerb(r, x) + E.dayLabel(x.on) + (x.on.slice(0, 4) !== S.today.slice(0, 4) ? " " + x.on.slice(0, 4) : "") : "";
       const hot = x && x.daysLeft <= 30 && !(x.value != null && x.value < 5);
-      return '<div class="pt"><span class="pt-name">' + esc(r.name) + (nameOf(r.owner) ? ' <span class="muted">· ' + esc(nameOf(r.owner)) + "</span>" : "") + "</span>" +
-        '<span class="mono pt-bal">' + esc(r.unit === "HK$" ? E.hkd(r.balance, 2) : fmtCount(r.balance)) + "</span>" +
-        '<span class="pt-sub' + (hot ? " hot" : "") + '">' + esc(when) + (r.progress ? " · " + esc(r.progress) : "") + "</span></div>";
+      const state = r.usable === true ? "ok" : (r.usable === false ? "no" : "unk");
+      const unitWord = r.kind === "miles" ? "miles" : "points";
+      const use = r.usable === true ? "Usable. " + r.use
+        : (r.usable === false ? "Needs " + fmtCount(r.short) + " more " + unitWord + ". " + r.use : "Value not published. " + r.use);
+      const bal = r.unit === "HK$" ? E.hkd(r.balance, 2) : (r.unit === "RC" ? "$" + fmtCount(r.balance) + " RC" : fmtCount(r.balance));
+      return '<div class="pt ' + state + '"><span class="pt-name">' + esc(r.name) + (nameOf(r.owner) ? ' <span class="muted">· ' + esc(nameOf(r.owner)) + "</span>" : "") + "</span>" +
+        '<span class="pt-right"><span class="mono pt-bal">' + esc(bal) + "</span>" + (r.value != null && r.unit !== "HK$" ? '<span class="pt-val">≈ ' + esc(money(r.value)) + "</span>" : "") + "</span>" +
+        '<span class="pt-use">' + esc(use) + "</span>" +
+        (when ? '<span class="pt-sub' + (hot ? " hot" : "") + '">' + esc(when) + "</span>" : "") +
+        (r.progress ? '<span class="pt-sub">' + esc(r.progress) + "</span>" : "") + "</div>";
     };
     const asOf = rows.map((r) => r.asOf).filter(Boolean).sort()[0];
     return '<div class="section-h"><span>Points and miles</span>' + (asOf ? '<span class="mono">as of ' + esc(E.dayLabel(asOf)) + "</span>" : "") + "</div>" +
       '<div class="list pts">' + rows.map(line).join("") + "</div>" +
-      '<p class="hint">Send Claude a screenshot of an app to update a balance.</p>';
+      '<p class="hint">Airline miles: HK$ value estimated for their cheapest use. Send Claude a screenshot of an app to update a balance.</p>';
   }
   async function copyText(text, el) {
     try { await navigator.clipboard.writeText(text); toast("Link copied."); }

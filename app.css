@@ -283,10 +283,35 @@ a.btn { display: inline-block; text-decoration: none; }
 .card-line .cl-state.on { color: var(--good); }
 .flight { display: grid; grid-template-columns: 1fr auto; gap: 2px 10px; padding: 10px 12px; border: 1px solid var(--line); border-radius: 12px; background: var(--surface); }
 .flight .fl-sub { color: var(--muted); font-size: 13px; }
-.pt { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 2px 10px; padding: 10px 12px; border: 1px solid var(--line); border-radius: 12px; background: var(--surface); }
-.pt .pt-name { min-width: 0; }
+.pt { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 2px 10px; padding: 10px 12px 10px 14px; border: 1px solid var(--line); border-left: 4px solid var(--line); border-radius: 12px; background: var(--surface); }
+.pt.ok { border-left-color: var(--good); }
+.pt.no { border-left-color: var(--bad); }
+.pt .pt-name { min-width: 0; font-weight: 600; }
+.pt .pt-right { display: grid; justify-items: end; }
+.pt .pt-val { font-size: 13px; color: var(--muted); font-variant-numeric: tabular-nums; }
+.pt .pt-use { grid-column: 1 / -1; font-size: 13px; }
+.pt.ok .pt-use { color: var(--good); }
+.pt.no .pt-use { color: var(--bad); }
+.pt.unk .pt-use { color: var(--muted); }
 .pt .pt-sub { grid-column: 1 / -1; color: var(--muted); font-size: 13px; }
 .pt .pt-sub.hot { color: var(--warn); font-weight: 600; }
+/* The answer as steps: points or miles to use, the HeyMax link, then the card. */
+.steps { list-style: none; margin: 0; padding: 0; display: grid; gap: 10px; counter-reset: step; }
+.step { position: relative; padding: 12px 12px 12px 44px; border: 1px solid var(--line); border-radius: var(--r); background: var(--surface); font-size: 14.5px; display: grid; gap: 8px; min-width: 0; }
+.step::before { counter-increment: step; content: counter(step); position: absolute; left: 12px; top: 11px; width: 22px; height: 22px; border-radius: 999px; background: var(--ink); color: var(--bg); font: 700 13px/22px var(--f-data); text-align: center; }
+.step b { font-weight: 700; }
+.step .cardpic { margin: 0; padding: 0; border: 0; background: none; gap: 12px; }
+.step .cp-img.landscape, .step .cp-mini { width: min(150px, 38vw); }
+.step .cp-img.portrait { height: min(130px, 34vw); }
+.step .cp-rate { font-size: 30px; }
+.uses { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
+.uses li { padding-left: 12px; border-left: 3px solid var(--good); }
+.step-h { margin: 0; font-weight: 700; }
+.backup { margin: 0; font-size: 13.5px; color: var(--muted); display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
+.total { margin: 0; font-size: 15px; }
+.why-more { border-top: 1px solid var(--line); padding-top: 8px; }
+.why-more > summary { cursor: pointer; color: var(--accent); font-weight: 600; }
+.why-more > * + * { margin-top: 10px; }
 
 /* spending */
 .month-nav { display: flex; align-items: center; justify-content: space-between; gap: 10px; }

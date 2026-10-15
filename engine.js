@@ -165,6 +165,7 @@
     // Other everyday places
     { n: "Wellcome", a: ["wellcome", "惠康"], c: "grocery" },
     { n: "Market Place", a: ["market place", "marketplace", "jasons", "3hreesixty"], c: "grocery" },
+    { n: "Oliver's", a: ["oliver's", "olivers", "oliver's the delicatessen"], c: "grocery" },
     { n: "7-Eleven", a: ["7-eleven", "7 eleven", "7eleven", "711"], c: "grocery" },
     { n: "Circle K", a: ["circle k", "ok便利店"], c: "grocery" },
     { n: "Mannings", a: ["mannings", "萬寧"], c: "retail" },
@@ -205,7 +206,8 @@
     { n: "Emirates", a: ["emirates"], c: "online_fx_hkd", f: { flight: 1 } },
     { n: "Lufthansa", a: ["lufthansa"], c: "online_fx_hkd", f: { flight: 1 } },
     { n: "SWISS", a: ["swiss international", "swiss air", "swiss"], c: "online_fx_hkd", f: { flight: 1 } },
-    { n: "Air France", a: ["air france"], c: "online_fx_hkd", f: { flight: 1 } },
+    { n: "Air France", a: ["air france", "klm", "air france klm"], c: "online_fx_hkd", f: { flight: 1 } },
+    { n: "Delta", a: ["delta air lines", "delta airlines", "delta.com"], c: "online_fx_hkd", f: { flight: 1 } },
     { n: "Finnair", a: ["finnair"], c: "online_fx_hkd", f: { flight: 1 } },
     { n: "Etihad", a: ["etihad"], c: "online_fx_hkd", f: { flight: 1 } },
     { n: "Kiwi.com", a: ["kiwi.com", "kiwi com"], c: "online_fx_hkd", f: { flight: 1 } },
@@ -263,27 +265,42 @@
   ];
 
   /* ---------- loyalty programmes ---------- */
-  // Shop programmes: the app to scan at the till. `perHkd` = points worth HK$1 when spent. Airline programmes and
-  // HeyMax are listed so balances and expiry dates can be shown; the balances themselves live in the private store.
+  // What a balance is worth and when it can be used (checked October 2026). `perHkd` = points for HK$1 at the till;
+  // `unit: "HK$"` = the balance is in dollars; `hkdEach` = HK$ a mile or point is worth in its cheapest realistic use
+  // (an estimate for airline miles); `min` = the least needed for that use (null when unknown). `use` says how.
+  // `at` = places where the balance can be spent: the page suggests it there, before the card, when it is enough.
+  // Balances live in the private store, never in these files.
+  const MONEYBACK_SHOPS = ["PARKnSHOP", "Fortress", "Watsons", "TASTE", "FUSION", "GREAT FOOD HALL", "food le parc", "PNS eShop", "Fortress eShop", "Watson's Wine"];
   const PROGRAMS = {
-    moneyback: { name: "MoneyBack", kind: "shop", perHkd: 50, at: ["PARKnSHOP", "Fortress", "Watsons", "TASTE", "FUSION", "GREAT FOOD HALL", "food le parc", "3 Hong Kong", "PNS eShop", "Fortress eShop", "Watson's Wine"] },
-    yuu: { name: "yuu", kind: "shop", perHkd: 200, at: ["Wellcome", "Market Place", "7-Eleven", "Mannings", "IKEA", "Maxim's", "KFC", "Pizza Hut", "PHD (Pizza Hut Delivery)"] },
-    dsgroceries: { name: "DS Groceries", kind: "shop", at: ["DS Groceries"] },
-    msblue: { name: "M&S (Blue app)", kind: "shop", unit: "HK$", at: ["Marks & Spencer"] },
-    heymax: { name: "HeyMax Max Miles", kind: "miles", hkdEach: 0.12 },
-    asiamiles: { name: "Asia Miles (Cathay)", kind: "miles" },
-    qatar: { name: "Qatar Privilege Club (Avios)", kind: "miles" },
-    turkish: { name: "Turkish Miles&Smiles", kind: "miles" },
-    flyingblue: { name: "Flying Blue (Air France-KLM)", kind: "miles" },
-    milesmore: { name: "Miles & More (Lufthansa)", kind: "miles" },
-    delta: { name: "Delta SkyMiles", kind: "miles" },
+    moneyback: { name: "MoneyBack", useName: "MoneyBack points", kind: "shop", perHkd: 50, min: 50, use: "Pay with points at the till (50 points = HK$1).", at: MONEYBACK_SHOPS.concat(["3 Hong Kong"]) },
+    yuu: { name: "yuu", useName: "yuu points", kind: "shop", perHkd: 200, min: 200, use: "Pay with points at the till (200 points = HK$1).",
+      at: ["Wellcome", "Market Place", "Oliver's", "7-Eleven", "Mannings", "IKEA", "Maxim's", "Starbucks", "KFC", "Pizza Hut", "PHD (Pizza Hut Delivery)"] },
+    dsgroceries: { name: "DS Groceries (DS Fans)", useName: "DS Fans points", kind: "shop", min: null, use: "The DS Fans app lists what the points buy.", at: ["DS Groceries"] },
+    msblue: { name: "M&S (Blue)", useName: "Blue balance", kind: "shop", unit: "HK$", min: 0.01, use: "Pay with the Blue balance at the till.", at: ["Marks & Spencer"] },
+    // RewardCash pays anywhere through MoneyBack: Reward+ converts $1 RC into 50 MoneyBack points at once.
+    rewardcash: { name: "HSBC RewardCash", useName: "HSBC RewardCash", kind: "shop", unit: "RC", perHkd: 1, min: 1,
+      use: "In HSBC Reward+, convert it to MoneyBack points ($1 = 50 points = HK$1), then pay with points.", at: MONEYBACK_SHOPS },
+    heymax: { name: "HeyMax Max Miles", kind: "miles", hkdEach: 0.12, min: 1000, use: "FlyAnywhere pays a whole flight back, HK$0.12 a Max Mile, claimed within 31 days of booking." },
+    asiamiles: { name: "Asia Miles (Cathay)", useName: "Asia Miles", kind: "miles", hkdEach: 0.12, min: 7000,
+      atUse: { "HK Express": "HK Express takes Asia Miles for the whole fare (Essential fare): pick Full Miles when booking on its website." },
+      use: "One-way economy on Cathay up to 750 miles (Taipei, Kaohsiung, Manila): 7,000 miles plus taxes.", at: ["Cathay Pacific", "HK Express"] },
+    qatar: { name: "Qatar Privilege Club (Avios)", useName: "Qatar Avios", kind: "miles", hkdEach: 0.12, min: 6000,
+      use: "One-way economy up to 650 miles on Cathay or another partner (e.g. Hong Kong–Taipei): 6,000 Avios plus taxes.", at: ["Qatar Airways", "Cathay Pacific"] },
+    turkish: { name: "Turkish Miles&Smiles", useName: "Turkish miles", kind: "miles", hkdEach: 0.1, min: 35000,
+      use: "Cheapest award from Asia: one-way economy to Türkiye from 35,000 miles (promotion seats).", at: ["Turkish Airlines"] },
+    flyingblue: { name: "Flying Blue (Air France-KLM)", useName: "Flying Blue miles", kind: "miles", hkdEach: 0.065, min: 5000,
+      use: "Cash & Miles at checkout on Air France or KLM: part of the fare, at most 25%, about €0.008 a mile.", at: ["Air France"] },
+    milesmore: { name: "Miles & More (Lufthansa)", useName: "Miles & More miles", kind: "miles", hkdEach: 0.04, min: 3000,
+      use: "Cash & Miles at checkout on Lufthansa, SWISS or Austrian: from 3,000 miles, about HK$0.04 a mile.", at: ["Lufthansa", "SWISS"] },
+    delta: { name: "Delta SkyMiles", useName: "Delta miles", kind: "miles", hkdEach: 0.078, min: 5000,
+      use: "Pay with Miles from 5,000 miles (US$50), for Delta card holders.", at: ["Delta"] },
   };
   const programsAt = (merchantName) => Object.keys(PROGRAMS).filter((id) => (PROGRAMS[id].at || []).includes(merchantName));
 
   // HeyMax shopping portal, Hong Kong (rates as listed in the app on 14 Oct 2026): `per` = HK$ spent for 1 Max Mile;
   // `fixed` = flat Max Miles. Start from the HeyMax app (or its link) before paying, or nothing is tracked.
   const HEYMAX = {
-    "Trip.com": { k: "tripcom", per: 3, note: "Flights earn far less: about 1 Max Mile per HK$17 of the fare before taxes." },
+    "Trip.com": { k: "tripcom", per: 3, note: "Flights give much less: about HK$0.70 back per HK$100 of the fare before taxes." },
     "Klook": { k: "klook", per: 0.8 },
     "Agoda": { k: "agoda", per: 2.7 },
     "Expedia": { k: "expedia", per: 4 },
@@ -347,23 +364,64 @@
       }
       runs.sort((x, y) => (x.on < y.on ? -1 : x.on > y.on ? 1 : 0));
       for (const r of runs) r.daysLeft = dnum(r.on) - dnum(today);
+      // Usable when the balance reaches the programme's smallest use; unknown when the programme doesn't say.
+      const min = p.min != null ? Number(p.min) : prog.min;
+      const usable = min == null ? null : balance >= min && balance > 0;
       rows.push({
         id: p.id || p.program + "_" + (p.owner || ""), program: p.program, name: prog.name, kind: prog.kind, owner: p.owner || "",
+        users: Array.isArray(p.users) && p.users.length ? p.users : [p.owner || "a"],
         unit: prog.unit || (prog.kind === "miles" ? "miles" : "points"), balance, value, runs, next: runs[0] || null,
+        min, usable, short: usable === false ? Math.max(0, Math.ceil(min - balance)) : 0, use: p.use || prog.use || "",
         progress: p.progress || "", note: p.note || "", asOf: p.asOf || "",
       });
     }
     // Shop programmes first, then miles; within each, what runs out first.
     return rows.sort((x, y) => (x.kind === y.kind ? 0 : x.kind === "shop" ? -1 : 1) || String(x.next ? x.next.on : "9999").localeCompare(String(y.next ? y.next.on : "9999")));
   }
+  // Balances worth using at this place, for this person, before paying: only those big enough to use.
+  function pointsToUse(merchantName, rows, payer) {
+    return (rows || []).filter((r) => {
+      const prog = PROGRAMS[r.program];
+      return prog && r.program !== "heymax" && r.usable === true && r.users.includes(payer) && (prog.at || []).includes(merchantName);
+    });
+  }
+  // Rently's Max Miles land a few days after each rent payment (the 12th): the credits expected between two dates.
+  function rentCredits(from, to, cfg, paymentsSoFar) {
+    const out = [];
+    const r = cfg.rently || {};
+    const payDay = Number(r.payDay) || 12, lag = Number(r.creditDays) || 3;
+    let n = Number(paymentsSoFar) || 0;
+    let m = ym(from) + "-01";
+    for (let i = 0; i < 3; i++) {
+      const d = addDays(m.slice(0, 8) + String(payDay).padStart(2, "0"), lag);
+      if (d > from && d <= to) { out.push({ date: d, miles: n < r.promoPayments ? r.promoMiles : r.standardMiles }); n++; }
+      m = addDays(m.slice(0, 8) + "28", 5).slice(0, 8) + "01";
+    }
+    return out;
+  }
+  // FlyAnywhere pays a whole flight back with Max Miles, claimed within 31 days of booking, from 1,000 Max Miles.
+  // Only confirmed miles count: what they cover now, and from when the rent's miles make a fare coverable.
+  function flyAnywhere(bookDate, amount, balance, cfg, paymentsSoFar) {
+    const rate = Number(cfg.miles.rate) || 0.12;
+    const deadline = addDays(bookDate, 31);
+    let have = Number(balance) || 0;
+    const steps = [{ date: bookDate, have }];
+    for (const c of rentCredits(bookDate, addDays(deadline, -2), cfg, paymentsSoFar)) { have += c.miles; steps.push({ date: c.date, have }); }
+    const needed = amount > 0 ? Math.ceil(amount / rate) : 0;
+    const ok = (x) => x.have >= 1000 && (!needed || x.have >= needed);
+    const when = steps.find(ok);
+    return { deadline, rate, needed, coverNow: Math.floor(steps[0].have * rate), coverBy: Math.floor(have * rate),
+      now: ok(steps[0]), claimFrom: when ? when.date : null };
+  }
   const countLabel = (n) => Math.round(n).toLocaleString("en-US");
-  // "7,962 miles", "41 points", "HK$0.45 of the balance", "Lavazza coupon (HK$49)".
+  // "7,500 miles", "40 points", "HK$0.50 of the balance", "$300 RewardCash", "Coffee coupon (HK$30)".
   function runLabel(row, x) {
     if (x.voucher) return x.voucher + (x.value ? " (" + hkd(x.value) + ")" : "");
     if (row.unit === "HK$") return (x.all ? "the balance, " : "") + hkd(x.amount, 2) + (x.all ? "" : " of the balance");
+    if (row.unit === "RC") return "$" + countLabel(x.amount) + " RewardCash";
     return countLabel(x.amount) + " " + (row.kind === "miles" ? "miles" : "points");
   }
-  const runVerb = (row, x) => (x.voucher ? " ends " : (row.unit === "HK$" || x.amount === 1 ? " expires " : " expire "));
+  const runVerb = (row, x) => (x.voucher ? " ends " : (row.unit === "HK$" || row.unit === "RC" || x.amount === 1 ? " expires " : " expire "));
   // What runs out within `horizon` days. Under HK$5 is only information.
   function pointsAlerts(rows, horizon) {
     const out = [];
@@ -414,6 +472,8 @@
     dailySpend: 200,
     // Each person's phone wallet, for the "default card" line ("" = generic wording).
     wallets: { a: "", b: "" },
+    // HSBC Travel Guru level per person: "", "go", "ging" or "guru". The offer runs until travelGuruEnd.
+    travelGuru: { a: "", b: "" }, travelGuruEnd: "2026-12-31",
     miles: { rate: 0.12, base: 0, pending: 0 },
     // Rently collects the FPS on the 12th and pays the landlord on the 16th.
     // The rent amount itself lives only in the private settings (config/main), never in these public files.
@@ -513,6 +573,21 @@
     if (cat.dining && !cat.hotel && !cat.online) return 0.05;
     return 0;
   }
+  // HSBC Travel Guru (members only; enrolment is closed): extra RewardCash on foreign-currency spending in shops
+  // abroad with HSBC cards, once HK$8,000 of it is spent within 3 consecutive calendar months; capped per year.
+  // The page counts the extra for members, as a target to reach, and shows how far along it is.
+  const TRAVEL_GURU = { go: { label: "GO", rate: 0.03, cap: 500 }, ging: { label: "GING", rate: 0.04, cap: 1200 }, guru: { label: "GURU", rate: 0.06, cap: 2200 } };
+  const tgEligible = (cat) => !!(cat && cat.group === "abroad" && cat.inPerson && cat.fx);
+  function travelGuru(p, cat, cfg, st, date, amt) {
+    const lvl = cfg.travelGuru && TRAVEL_GURU[cfg.travelGuru[p]];
+    if (!lvl || !tgEligible(cat) || (cfg.travelGuruEnd && date > cfg.travelGuruEnd)) return null;
+    const left = Math.max(0, lvl.cap - st.tgExtra(p, yr(date)));
+    const rate = amt ? Math.min(lvl.rate * amt, left) / amt : (left > 0 ? lvl.rate : 0);
+    const spent = st.tgSpent(p, date);
+    const why = "Travel Guru " + lvl.label + ": " + pct(lvl.rate) + " extra" + (left > 0 ? "" : " (yearly cap reached)") +
+      (spent >= 8000 ? "" : ", once HSBC cards reach " + hkd(8000) + " in shops abroad within 3 months (" + hkd(spent) + " so far)");
+    return { rate, why };
+  }
   function blend(hi, lo, capLeft, amt) {
     if (!amt) return capLeft > 0 ? hi : lo;
     const inCap = Math.min(Math.max(capLeft, 0), amt);
@@ -549,6 +624,8 @@
           why.push(left > 0 ? "4% on online spending, " + hkd(left) + " left at 4% this month" : "This month's 4% online cap (HK$10,000) is used up: 0.4% now");
           if (amt && left > 0 && amt > left) why.push("Only " + hkd(left) + " of this earns 4%, the rest 0.4%");
         } else { rebate = 0.004; why.push("Red pays only 0.4% in shops (except its partner list)"); }
+        const tg = travelGuru(def.holder, cat, cfg, st, date, amt);
+        if (tg) { rebate += tg.rate; why.push(tg.why); }
         fee = feeFor(0.01);
         break;
       }
@@ -569,6 +646,8 @@
           rebate += vip ? 0.024 : 0.016;
           why.push("Plus MoneyBack points: about " + (vip ? "2.4% (VIP)" : "1.6%, or 2.4% for VIP members"));
         }
+        const tg = travelGuru(p, cat, cfg, st, date, amt);
+        if (tg) { rebate += tg.rate; why.push(tg.why); }
         if (!why.length) why.push("Basic 0.4% RewardCash");
         fee = feeFor(0.01);
         break;
@@ -643,14 +722,25 @@
   }
 
   /* ---------- running totals ---------- */
+  // The three calendar months ending with `date`'s month, oldest first ("2026-08", "2026-09", "2026-10").
+  function lastMonths(date, n) {
+    const out = [];
+    let d = ym(date) + "-01";
+    for (let i = 0; i < n; i++) { out.unshift(ym(d)); d = addDays(d, -1).slice(0, 8) + "01"; }
+    return out;
+  }
   function newState() {
-    const red = {}, hsm = {}, rh = {}, wel = {};
+    const red = {}, hsm = {}, rh = {}, wel = {}, tgm = {}, tgx = {};
     return {
-      red, hsm, rh, wel,
+      red, hsm, rh, wel, tgm, tgx,
       redUse: (acct, m) => (red[acct] && red[acct][m]) || { online: 0, red8: 0 },
       hsMonth: (card, m) => (hsm[card] && hsm[card][m]) || { spend: 0, extra: 0 },
       redHotYtd: (p, y) => (rh[p] && rh[p][y]) || 0,
       welcome: (id) => wel[id] || 0,
+      // Travel Guru: spending in shops abroad on HSBC cards this month and the two before; extra earned this year.
+      tgSpent: (p, date) => lastMonths(date, 3).reduce((sum, m) => sum + ((tgm[p] && tgm[p][m]) || 0), 0),
+      tgMonth: (p, m) => (tgm[p] && tgm[p][m]) || 0,
+      tgExtra: (p, y) => (tgx[p] && tgx[p][y]) || 0,
     };
   }
   function welcomeWindows(cfg) {
@@ -674,6 +764,16 @@
       const u = a[m] || (a[m] = { online: 0, red8: 0 });
       if (cat.red8) u.red8 += amt;
       else if (cat.online) u.online += amt;
+    }
+    if ((def.kind === "easy" || def.kind === "red") && tgEligible(cat)) {
+      const p = def.holder;
+      const tm = st.tgm[p] || (st.tgm[p] = {});
+      tm[m] = (tm[m] || 0) + amt;
+      const lvl = cfg.travelGuru && TRAVEL_GURU[cfg.travelGuru[p]];
+      if (lvl) {
+        const tx = st.tgx[p] || (st.tgx[p] = {});
+        tx[yr(t.date)] = Math.min(lvl.cap, (tx[yr(t.date)] || 0) + lvl.rate * amt);
+      }
     }
     if (def.kind === "easy") {
       const p = def.holder;
@@ -917,6 +1017,26 @@
     const ty = Number(today.slice(0, 4)), tm = Number(today.slice(5, 7));
     const nextMonth = (tm === 12 ? (ty + 1) + "-01" : ty + "-" + String(tm + 1).padStart(2, "0")) + "-01";
     const monthEnd = addDays(nextMonth, -1);
+    // Travel Guru: HK$8,000 in shops abroad on HSBC cards within 3 consecutive months unlocks the extra rate.
+    for (const p of ["a", "b"]) {
+      const lvl = cfg.travelGuru && TRAVEL_GURU[cfg.travelGuru[p]];
+      if (!lvl || (cfg.travelGuruEnd && today > cfg.travelGuruEnd)) continue;
+      const months = lastMonths(today, 3);
+      const first = months.find((mm) => st.tgMonth(p, mm) > 0);
+      const used = st.tgSpent(p, today);
+      if (!first && !used) continue;
+      const startM = first || m;
+      const endMonth = lastMonths(addDays(startM + "-01", 70), 1)[0];
+      const deadline = addDays(addDays(endMonth + "-28", 5).slice(0, 8) + "01", -1);
+      const reached = used >= 8000;
+      const left = daysTo(deadline);
+      const collected = Math.min(lvl.cap, st.tgExtra(p, yr(today)));
+      meters.push({ key: "tg_" + p, kind: "threshold", card: "easy_" + p, title: "Travel Guru " + lvl.label + " " + pct(lvl.rate), used, cap: 8000,
+        left: Math.max(0, 8000 - used), deadline, daysLeft: left + 1, reached, closed: false,
+        unlocks: pct(lvl.rate) + " extra RewardCash in shops abroad (up to $" + lvl.cap.toLocaleString("en-US") + ")",
+        collected: reached ? collected : 0, collectedOf: lvl.cap,
+        detail: reached ? "Unlocked" : hkd(8000 - used) + " more in shops abroad on HSBC cards by " + dayLabel(deadline), state: reached ? "good" : "info" });
+    }
     for (const w of res.windows) {
       const done = st.welcome(w.id);
       const left = daysTo(w.end);
@@ -972,12 +1092,16 @@
     const miles = { balance, pending, value: balance * cfg.miles.rate, rate: cfg.miles.rate };
 
     // FlyAnywhere pays back a whole ticket in Max Miles (no partial claims), within 31 days of booking.
+    // Waiting costs nothing until the deadline: the rent's miles that land before it count too (confirmed miles only).
     const flights = (txns || []).filter((t) => t.flags && t.flags.flight).map((t) => {
       const deadline = addDays(t.date, 31);
       const amount = Number(t.amount) || 0;
       const needed = Math.ceil(amount / cfg.miles.rate);
+      const fa = flyAnywhere(today > t.date ? today : t.date, amount, balance + 0, cfg, rentTx.length);
+      const claimFrom = fa.claimFrom && fa.claimFrom <= addDays(deadline, -2) ? fa.claimFrom : null;
       return { id: t.id, merchant: t.merchant, date: t.date, amount, payer: t.payer, card: t.card, deadline, daysLeft: daysTo(deadline),
-        claimed: !!t.claimed, claimedMiles: Number(t.claimedMiles) || 0, needed, canClaim: balance >= needed };
+        claimed: !!t.claimed, claimedMiles: Number(t.claimedMiles) || 0, needed, canClaim: balance >= needed && balance >= 1000,
+        claimFrom: balance >= needed ? null : claimFrom };
     }).sort((a, b) => (a.deadline < b.deadline ? -1 : 1));
     const due = nextDue(today, cfg.rently.dueDay);
     const payDay = Number(cfg.rently.payDay) || 0;
@@ -994,7 +1118,9 @@
       }
     }
     for (const f of flights) {
-      if (!f.claimed && f.canClaim && f.daysLeft >= 0 && f.daysLeft <= 14) alerts.push({ level: f.daysLeft <= 5 ? "bad" : "warn", kind: "flight", id: f.id, text: "Pay back " + (f.merchant || "a flight") + " with Max Miles by " + dayLabel(f.deadline), sub: "FlyAnywhere: " + Math.round(f.needed).toLocaleString("en-US") + " Max Miles for the whole ticket, " + Math.round(balance).toLocaleString("en-US") + " available. HK$" + cfg.miles.rate.toFixed(2) + " a mile, paid by FPS." });
+      if (f.claimed || f.daysLeft < 0) continue;
+      if (f.canClaim && f.daysLeft <= 7) alerts.push({ level: f.daysLeft <= 3 ? "bad" : "warn", kind: "flight", id: f.id, text: "Pay back " + (f.merchant || "a flight") + " with Max Miles by " + dayLabel(f.deadline), sub: "FlyAnywhere: " + countLabel(f.needed) + " Max Miles for the whole ticket, " + countLabel(balance) + " available. HK$" + cfg.miles.rate.toFixed(2) + " a mile, paid by FPS." });
+      else if (f.claimFrom) alerts.push({ level: "info", kind: "flight", id: f.id, text: (f.merchant || "A flight") + ": Max Miles can pay it back from " + dayLabel(f.claimFrom), sub: "Once the rent's Max Miles land. Claim in FlyAnywhere between " + dayLabel(f.claimFrom) + " and " + dayLabel(f.deadline) + "." });
     }
     for (const mt of meters) {
       if (mt.key.startsWith("wel_") && mt.state === "warn") alerts.push({ level: "warn", kind: "welcome", text: "Behind on the " + cardLabel(mt.card) + " welcome bonus", sub: mt.detail });
@@ -1010,7 +1136,8 @@
   }
 
   const api = {
-    PEOPLE, setPeople, cardName, PROGRAMS, programsAt, HEYMAX, heymaxFor, pointsSummary, pointsAlerts, runLabel, runVerb,
+    PEOPLE, setPeople, cardName, PROGRAMS, programsAt, HEYMAX, heymaxFor, pointsSummary, pointsAlerts, runLabel, runVerb, pointsToUse,
+    flyAnywhere, rentCredits, TRAVEL_GURU,
     CARDS, CARD_ORDER, CATS, COUNTRIES, MERCHANTS, PROMOS, DEFAULT_CONFIG,
     mergeConfig, deepMerge, matchMerchants, promosFor, rateFor, recommend, networkGap, defaultCard, audit, status, newState,
     cardLabel, cardActive, usableBy, holds, welcomeWindows, abroadCat, norm, pct, hkd, addDays, ym, dayLabel, monthLabel,
