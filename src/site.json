@@ -1,0 +1,14 @@
+{
+  "payer": "b",
+  "builtOn": "2026-10-15",
+  "cfg": {
+    "cards": {
+      "red_b": { "status": "active", "since": "2026-10-12" },
+      "citi": { "status": "pending", "approvedOn": "", "suppCard": false },
+      "hs_b": { "status": "planned", "issuedOn": "", "funRegistered": false }
+    },
+    "redHot": { "b": { "cat": "home", "since": "2026-10-12" } },
+    "moneybackVip": { "b": false }
+  },
+  "welcomeDone": []
+}
