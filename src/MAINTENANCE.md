@@ -83,7 +83,10 @@ miles are not counted.
 
 Expenses come from the bank's emails (HSBC transaction notifications, statements) that the owner's Gmail filter puts
 in the "Banking" label: import them when the owner asks, not on a schedule. Skip card-verification charges (HK$1 when
-a card is linked to an app such as HeyMax) and their refunds. Only plane tickets are logged from the Which card tab,
+a card is linked to an app such as HeyMax) and their refunds; a return cancels its purchase; `DCC FEE` lines are left
+to the engine (the category carries the 1%). `AlipayHK*NUCC` is AlipayHK paying in mainland China, charged in HK$
+(`wallet_buy`); `ALP*` or `Alipay*` lines from China are the card used in mainland Alipay, in yuan (`abroad_asia7`).
+Only plane tickets are logged from the Which card tab,
 so Status can follow their FlyAnywhere claim.
 Travel sites (Trip.com, Expedia) ask whether the purchase is a flight: HeyMax pays much less on flights (`flightPer`
 in `HEYMAX`), and Trip Coins too.

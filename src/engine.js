@@ -469,6 +469,8 @@
     { m: ["parknshop", "watsons", "fortress"], card: "easy", text: "MoneyBack member days: up to 8% off at PARKnSHOP and Watsons, 5% at Fortress, above a minimum spend.", until: "" },
     // Tips are facts about paying there, not offers.
     { m: ["taobao", "tmall"], tip: 1, text: "Paying from the AlipayHK balance or a linked bank account costs 1% instead of 1.5%, but earns no card rewards.", until: "" },
+    // AlipayHK's cross-border payments reach the card in HK$ from a Hong Kong merchant (AlipayHK*NUCC on the statement).
+    { m: ["mainland china", "thailand china", "shenzhen", "深圳"], tip: 1, text: "In mainland China, pay through AlipayHK with a card linked in it: the card is charged in HK$, so no 1.95% foreign-currency fee. Link any card but the Red, which earns nothing on AlipayHK.", until: "" },
   ];
 
   /* ---------- configuration ---------- */

@@ -163,6 +163,9 @@ r = rec(citiOn, { date: "2026-12-05", catId: "taobao", amount: 2900 }, citiDone)
 check("Taobao once Citi is in -> Citi −0.5%", r.pick.id + " " + E.pct(r.pick.net), "citi −0.5%");
 check("Hang Seng pays 1.3% to Taobao", E.pct(E.rateFor("hs_a", "taobao", { cfg: hsOn, st: E.newState(), date: "2026-12-05", amount: 100 }).net), "−0.9%");
 check("Taobao tip is shown", E.promosFor("Taobao / Tmall (AlipayHK)", "easy_a").some((p) => p.tip), true);
+const cnTip = (name) => E.promosFor(name, "easy_b").some((p) => p.tip && /mainland China/.test(p.text));
+check("AlipayHK tip in mainland China (abroad row and HK row)", [cnTip("Shops and restaurants in Mainland China"), cnTip("Shops in Japan, Thailand, China")].join(" "), "true true");
+check("...not at Hong Kong shops named China", [cnTip("China Mobile"), cnTip("Air China")].join(" "), "false false");
 
 // Flight agencies that charge more for Mastercard: the Red absorbs up to 3.6% more than the easy pays.
 const mt = E.matchMerchants("mytrip", [])[0];
