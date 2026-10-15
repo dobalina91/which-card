@@ -1,6 +1,6 @@
 // The stand-alone page works without signal: fresh copy when online (within 3.5 s), saved copy otherwise.
 // Paths are relative to this file, so the page works from any folder (e.g. a GitHub Pages project site).
-const CACHE = "which-card-2026-10-15-9bc8fc07";
+const CACHE = "which-card-2026-10-15-00c3364d";
 const HOME = new URL("./", self.location).href;
 const CORE = ["./", "app.css", "config.js", "engine.js", "app.js", "manifest.webmanifest", "icon-180.png", "icon-192.png",
   "cards/red.webp", "cards/red-thumb.webp", "cards/easy.webp", "cards/easy-thumb.webp"];
