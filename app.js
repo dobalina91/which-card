@@ -64,14 +64,17 @@
     { label: "Shops in Japan, Thailand, China", cat: "abroad_asia7" },
     { label: "Shops in France or Europe", cat: "abroad_eea" },
   ];
+  // The Red's 8% partners abroad are in Japan and Korea only.
+  const RED8_ABROAD = { jp: "FamilyMart, Suica", kr: "Olive Young, T-money" };
   function quickList() {
     if (!S.ask.abroad) return QUICK_HK;
-    return [
-      { label: "Shops and restaurants in " + countryLabel(), cat: E.abroadCat(countryRegion()) },
-      { label: "FamilyMart, Suica, Olive Young", cat: "red8_abroad" },
-      { label: "Website in a foreign currency", cat: "online_fx" },
-      { label: "Flights, Booking, Agoda (in HKD)", cat: "online_fx_hkd" },
-    ];
+    const p8 = RED8_ABROAD[S.ask.country];
+    return [{ label: "Shops and restaurants in " + countryLabel(), cat: E.abroadCat(countryRegion()) }]
+      .concat(p8 ? [{ label: p8, cat: "red8_abroad" }] : [])
+      .concat([
+        { label: "Website in a foreign currency", cat: "online_fx" },
+        { label: "Flights, Booking, Agoda (in HKD)", cat: "online_fx_hkd" },
+      ]);
   }
   const STATUS_LABEL = { active: "Active", pending: "Applied, waiting", planned: "To apply", closed: "Closed" };
   const RH_LABEL = { "": "Not registered", home: "Home (PARKnSHOP, Fortress, telecoms…)", shopping: "Shopping (Watsons, AEON, YATA…)", dining: "Dining", overseas: "Overseas" };
@@ -88,6 +91,7 @@
     db: null, sample: null, uid: null,
     dbState: SOLO ? "solo" : "connecting",
     cfgExists: false,
+    rawCfg: {}, // config/main as stored, without the engine's defaults
     txLoaded: false,
     quickList: null,
     readOnly: false,
@@ -183,6 +187,14 @@
     return mc || visa ? { netFee: { mastercard: mc, visa } } : {};
   }
   const askFlags = (sel) => Object.assign({}, (sel && sel.flags) || {}, netFeeFlags(), S.ask.trip === "flight" ? { flight: 1 } : {});
+  // Another place picked (a suggestion, a kind of place, a quick row): the flight-or-hotel choice and the fees typed
+  // for the previous one don't carry over.
+  function choose(sel) {
+    S.ask.sel = sel;
+    S.ask.trip = "";
+    S.ask.netFee = { mastercard: "", visa: "" };
+    renderAskBody();
+  }
   function clearAsk() {
     const A = S.ask;
     A.text = ""; A.sel = null; A.matches = []; A.claude = { busy: false, msg: "" }; A.netFee = { mastercard: "", visa: "" }; A.trip = "";
@@ -200,7 +212,21 @@
     else if (A.text.trim().length < 2) html = suggestionsHtml(A.matches, null) + quickHtml();
     else html = suggestionsHtml(A.matches, null) + unknownHtml(A.text.trim());
     box.innerHTML = html;
+    fitNumbers(box);
   }
+  // The big HK$ figure on the card shrinks until it fits its box: narrow phones, four-figure amounts, and a wider
+  // font once it has loaded.
+  function fitNumbers(root) {
+    for (const el of (root || document).querySelectorAll(".cp-rate")) {
+      el.style.fontSize = "";
+      const room = el.parentElement ? el.parentElement.clientWidth : 0;
+      if (!room) continue; // hidden: nothing to measure
+      let size = parseFloat(getComputedStyle(el).fontSize) || 34;
+      for (let i = 0; i < 12 && el.scrollWidth > room + 0.5 && size > 16; i++) { size -= 2; el.style.fontSize = size + "px"; }
+    }
+  }
+  if (document.fonts && document.fonts.ready) document.fonts.ready.then(() => fitNumbers()).catch(() => {});
+  window.addEventListener("resize", () => fitNumbers());
 
   /* ---------- the default card in the phone wallet ---------- */
   const walletOf = (p) => (S.cfg.wallets && S.cfg.wallets[p]) || "your phone's wallet";
@@ -358,7 +384,8 @@
 
     // The card, and a backup in case it isn't accepted.
     const [big, small] = cardBack(p, cat, amount);
-    const backup = rec.alts.find((o) => o.id !== "cash" && E.CARDS[o.id] && E.CARDS[o.id].net !== E.CARDS[p.id].net) || rec.alts.find((o) => o.id !== "cash");
+    // Rent goes by FPS to Rently: no card to fall back on there.
+    const backup = p.id === "fps" ? null : rec.alts.find((o) => o.id !== "cash" && E.CARDS[o.id] && E.CARDS[o.id].net !== E.CARDS[p.id].net) || rec.alts.find((o) => o.id !== "cash");
     const bk = backup ? cardBack(backup, cat, amount) : null;
     const scan = E.programsAt(sel.name).filter((id) => id === "moneyback" || id === "yuu").map((id) => E.PROGRAMS[id].name);
     const cardStep = (steps.length ? '<p class="step-h">Pay with</p>' : "") +
@@ -586,7 +613,9 @@
   }
   function allAlerts() {
     if (!S.status) return [];
-    return todoAlerts().concat(S.defAlerts || [], S.status.alerts, pointAlerts()).map((a, i) => ({ a, i }))
+    // Until the expenses have loaded, the rent looks unpaid: no rent alert before then.
+    const fromStatus = S.txLoaded ? S.status.alerts : S.status.alerts.filter((a) => a.kind !== "rent");
+    return todoAlerts().concat(S.defAlerts || [], fromStatus, pointAlerts()).map((a, i) => ({ a, i }))
       .sort((x, y) => (LEVEL[x.a.level] - LEVEL[y.a.level]) || (x.a.kind === "todo" && y.a.kind === "todo" ? String(x.a.due).localeCompare(String(y.a.due)) || x.a.order - y.a.order : x.i - y.i))
       .map((x) => x.a);
   }
@@ -597,6 +626,7 @@
     else if (a.kind === "flight") act = '<div class="a-act"><button type="button" class="btn small" data-act="open-tx" data-id="' + esc(a.id) + '">Mark as claimed</button></div>';
     else if (a.kind === "card") act = '<div class="a-act"><button type="button" class="btn small" data-act="settings">Update cards</button></div>';
     else if (a.kind === "rent" && canWrite()) act = '<div class="a-act"><button type="button" class="btn small" data-act="log-rent">Log the payment</button></div>';
+    else if (a.kind === "points" && a.on && canWrite()) act = '<div class="a-act"><button type="button" class="btn small" data-act="pt-seen" data-id="' + esc(a.id) + '" data-on="' + esc(a.on) + '">Got it</button></div>';
     return '<div class="alert ' + a.level + '"><span class="dot" aria-hidden="true"></span><div>' + esc(a.text) + '</div><div class="a-sub">' + esc(a.sub || "") + "</div>" + act + "</div>";
   }
   // Thresholds: what is left to spend to unlock the reward, and by when. Caps: what can still earn the bonus rate,
@@ -658,6 +688,10 @@
   }
   function renderStatus() {
     if (!S.status) return;
+    if (S.dbState === "off") {
+      $("#tab-status").innerHTML = '<p class="empty">The to-dos, caps and balances live in the shared store. Open this page in Claude, signed in, to see them.</p>';
+      return;
+    }
     const s = S.status;
     const alerts = allAlerts();
     const inAlerts = new Set(alerts.filter((a) => a.kind === "todo").map((a) => a.id));
@@ -691,6 +725,7 @@
     $("#tab-status").innerHTML =
       '<div class="section-h"><span>Needs attention</span>' + (alerts.length ? '<span class="mono">' + alerts.length + "</span>" : "") + "</div>" +
       '<div class="alerts">' + (alerts.length ? alerts.map(alertHtml).join("") : '<p class="empty">Nothing needs attention. Wrong-card payments and deadlines will show up here.</p>') + "</div>" +
+      todoBlock +
       metersHtml(s.meters) +
       '<div class="section-h"><span>Max Miles and rent</span></div>' +
       '<div class="facts">' +
@@ -700,7 +735,6 @@
       "</div>" +
       (flights.length ? '<div class="list">' + flights.map((f) => '<div class="flight"><span>' + esc(f.merchant || "Flight") + ' <span class="muted">· ' + esc(shortWithHolder(f.card)) + '</span></span><span class="mono">' + esc(E.hkd(f.amount)) + '</span><span class="fl-sub">' + esc(flightState(f)) + '</span><span><button type="button" class="linkish" data-act="open-tx" data-id="' + esc(f.id) + '">Edit</button></span></div>').join("") + "</div>" : "") +
       pointsHtml() +
-      todoBlock +
       '<div class="section-h"><span>Cards</span><button type="button" class="linkish" data-act="settings">Edit</button></div>' +
       '<div class="cards-list">' + cardsHtml + "</div>" +
       '<p class="hint">Red Hot Rewards 5X: ' + esc(rh) + ". Rates as checked in October 2026; the banks' terms decide in the end.</p>";
@@ -927,15 +961,23 @@
       a: { cat: v("s-rh-a").value, since: (S.cfg.redHot.a && S.cfg.redHot.a.cat === v("s-rh-a").value && S.cfg.redHot.a.since) || S.today },
       b: { cat: v("s-rh-b").value, since: (S.cfg.redHot.b && S.cfg.redHot.b.cat === v("s-rh-b").value && S.cfg.redHot.b.since) || S.today },
     };
+    // Each map is replaced whole on save, so start from what is stored. Values left as they were aren't written:
+    // a default saved here would hide the engine's later updates (a promo extended, say).
+    const raw = S.rawCfg || {};
     const doc = {
       cards, redHot,
       moneybackVip: { a: v("s-mb-a").checked, b: v("s-mb-b").checked },
-      travelPlus: { promoEnd: v("s-promoEnd").value || S.cfg.travelPlus.promoEnd, monthMode: v("s-monthMode").checked },
-      dailySpend: parseInt(String(v("s-daily").value).replace(/[^0-9]/g, ""), 10) || 200,
-      // The whole map is replaced on save: keep the miles on the way.
-      miles: { base: parseInt(String(v("s-milesBase").value).replace(/[^0-9]/g, ""), 10) || 0, pending: Number(S.cfg.miles.pending) || 0 },
+      miles: Object.assign({}, raw.miles || {}, { base: parseInt(String(v("s-milesBase").value).replace(/[^0-9]/g, ""), 10) || 0, pending: Number(S.cfg.miles.pending) || 0 }),
       updatedAt: nowIso(),
     };
+    const tp = Object.assign({}, raw.travelPlus || {});
+    const promoEnd = v("s-promoEnd").value;
+    if (promoEnd && promoEnd !== S.cfg.travelPlus.promoEnd) tp.promoEnd = promoEnd;
+    const monthMode = v("s-monthMode").checked;
+    if (monthMode !== (S.cfg.travelPlus.monthMode !== false)) tp.monthMode = monthMode;
+    if (JSON.stringify(tp) !== JSON.stringify(raw.travelPlus || {})) doc.travelPlus = tp;
+    const daily = parseInt(String(v("s-daily").value).replace(/[^0-9]/g, ""), 10) || 200;
+    if (daily !== S.cfg.dailySpend) doc.dailySpend = daily;
     try {
       const ref = S.db.doc("config/main");
       if (S.cfgExists) await ref.update(doc); else await ref.set(doc);
@@ -1198,16 +1240,20 @@
     if (b.dataset.tab) return setTab(b.dataset.tab);
     if (b.dataset.quick != null) {
       const q = (S.quickList || QUICK_HK)[Number(b.dataset.quick)];
-      if (q) { S.ask.sel = { name: q.label, cat: q.cat, flags: q.flags || {}, source: "quick" }; renderAskBody(); window.scrollTo(0, 0); }
+      if (q) { choose({ name: q.label, cat: q.cat, flags: q.flags || {}, source: "quick" }); window.scrollTo(0, 0); }
       return;
     }
     if (b.dataset.trip) { S.ask.trip = S.ask.trip === b.dataset.trip ? "" : b.dataset.trip; renderAskBody(); return; }
-    if (b.dataset.match != null) { const m = S.ask.matches.find((x) => x.name === b.dataset.match); if (m) { S.ask.sel = fromMatch(m); S.ask.netFee = { mastercard: "", visa: "" }; renderAskBody(); } return; }
+    if (b.dataset.match != null) { const m = S.ask.matches.find((x) => x.name === b.dataset.match); if (m) choose(fromMatch(m)); return; }
     if (b.dataset.cat) {
       const name = S.ask.text.trim();
-      S.ask.sel = { name: name || CAT_SHORT[b.dataset.cat], cat: b.dataset.cat, flags: {}, source: name ? "user" : "quick" };
+      choose({ name: name || CAT_SHORT[b.dataset.cat], cat: b.dataset.cat, flags: {}, source: name ? "user" : "quick" });
       if (name.length >= 3) saveLearned(name, b.dataset.cat, {}, "", "user");
-      renderAskBody();
+      return;
+    }
+    if (b.dataset.act === "pt-seen") {
+      // A balance's expiry noted: quiet until that date (the next one still alerts).
+      if (canWrite() && b.dataset.id && b.dataset.on) S.db.doc("points/" + b.dataset.id).update({ seenUntil: b.dataset.on }).then(() => toast("Noted.")).catch(writeError);
       return;
     }
     const id = b.dataset.id;
@@ -1320,6 +1366,7 @@
     db.doc("config/main").onSnapshot((snap) => {
       S.cfgExists = !!snap.exists;
       const data = snap.exists ? snap.data() : null;
+      S.rawCfg = data || {};
       S.cfg = E.mergeConfig(data);
       // Private settings: names (kept on this device too, so the header has them before the store answers) and links.
       if (data && data.people) { E.setPeople(data.people); store.set("people", { a: E.PEOPLE.a, b: E.PEOPLE.b }); }
@@ -1333,6 +1380,19 @@
     db.collection("promos").limit(100).onSnapshot((qs) => { S.extraPromos = qs.docs.map((d) => d.data()); }, fail);
     refresh();
   }
+
+  // A page left open (a home-screen app can stay in memory for days) moves to the new day when it comes back.
+  function checkDay() {
+    const t = localToday();
+    if (t === S.today) return;
+    if (S.month === E.ym(S.today)) S.month = E.ym(t);
+    S.today = t;
+    refresh();
+  }
+  document.addEventListener("visibilitychange", () => { if (!document.hidden) checkDay(); });
+  window.addEventListener("focus", checkDay);
+  window.addEventListener("pageshow", checkDay);
+  setInterval(checkDay, 5 * 60 * 1000);
 
   if (SOLO) {
     document.body.classList.add("solo");
