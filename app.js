@@ -784,7 +784,8 @@
   const extraNames = (r) => (r.miles ? ["Max Miles"] : []).concat(Object.keys(r.pointsBy || {}).map((k) => E.PROGRAMS[k].useName || E.PROGRAMS[k].name));
   // "card rewards, Max Miles and Trip Coins": what the Back figure is made of.
   const backParts = (r) => joinAnd(["card rewards"].concat(extraNames(r)));
-  // The Spending tab follows the person chosen at the top: their expenses and totals, and one line for both.
+  // The Spending tab follows the person chosen at the top: what their cards (or their FPS) paid, whoever it was for,
+  // with the totals, and one line for both.
   function renderSpend() {
     if (!S.status) return;
     const m = S.month;
@@ -804,11 +805,11 @@
     const chips = Object.keys(byCard).sort((a, b) => byCard[b] - byCard[a]).map((id) => cardPill(id, shortCard(id) + " · " + E.hkd(byCard[id]))).join("");
     const empty = S.dbState === "off"
       ? "Open this page in Claude, signed in, to see your shared spending."
-      : (!S.txLoaded ? "Loading…" : "Nothing logged" + (who ? " for " + who : "") + " in " + E.monthLabel(m) + ". After paying, tap “Paid with…” on the Which card tab, or Add expense. Send Claude the card statements and it fills this in.");
+      : (!S.txLoaded ? "Loading…" : "Nothing paid" + (who ? " by " + who : "") + " in " + E.monthLabel(m) + ". After paying, tap “Paid with…” on the Which card tab, or Add expense. Send Claude the card statements and it fills this in.");
     const both = all.spent !== me.spent || all.back !== me.back
       ? '<p class="hint together">Together: ' + esc(E.hkd(all.spent)) + " spent, about " + esc(money(all.back)) + " back after fees.</p>" : "";
     $("#tab-spend").innerHTML =
-      '<div class="month-nav"><button type="button" class="icon-btn" data-act="month" data-step="-1" aria-label="Previous month">‹</button><h2>' + esc((who ? who + " · " : "") + E.monthLabel(m)) + '</h2><button type="button" class="icon-btn" data-act="month" data-step="1" aria-label="Next month">›</button></div>' +
+      '<div class="month-nav"><button type="button" class="icon-btn" data-act="month" data-step="-1" aria-label="Previous month">‹</button><h2>' + esc((who ? "Paid by " + who + " · " : "") + E.monthLabel(m)) + '</h2><button type="button" class="icon-btn" data-act="month" data-step="1" aria-label="Next month">›</button></div>' +
       '<div class="facts"><div class="fact"><div class="f-k">Spent</div><div class="f-v">' + esc(E.hkd(me.spent)) + '</div><div class="f-s">rent not included</div></div>' +
       '<div class="fact"><div class="f-k">Back, about</div><div class="f-v">' + esc(E.hkd(me.rewards + me.miles + me.points)) + '</div><div class="f-s">' + esc(backParts(me)) + (me.rentMiles ? ", " + esc(E.hkd(me.rentMiles)) + " from the rent" : "") + "</div></div>" +
       '<div class="fact"><div class="f-k">Fees, about</div><div class="f-v">' + esc(E.hkd(me.fees)) + '</div><div class="f-s">foreign currency, overseas sites, Taobao</div></div>' +
