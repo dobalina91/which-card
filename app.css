@@ -281,6 +281,23 @@ a.btn { display: inline-block; text-decoration: none; }
 .card-line .pill { flex-shrink: 0; }
 .card-line .cl-state { font-size: 13px; color: var(--muted); text-align: right; }
 .card-line .cl-state.on { color: var(--good); }
+/* Status at a glance: one line per block, the details on tap. */
+.glance { display: grid; border: 1px solid var(--line); border-radius: var(--r); background: var(--surface); overflow: hidden; }
+.gl + .gl { border-top: 1px solid var(--line); }
+.gl > summary, .gl-row { display: grid; grid-template-columns: minmax(0, 1fr) 14px; align-items: center; gap: 3px 10px; padding: 11px 14px; }
+.gl > summary { cursor: pointer; list-style: none; }
+.gl > summary::-webkit-details-marker { display: none; }
+.gl > summary::after { content: ""; grid-column: 2; grid-row: 1 / span 3; justify-self: center; width: 7px; height: 7px; margin-top: -4px; border-right: 2px solid var(--muted); border-bottom: 2px solid var(--muted); transform: rotate(45deg); transition: transform 0.15s; }
+.gl[open] > summary::after { margin-top: 4px; transform: rotate(-135deg); }
+.gl-h { grid-column: 1; justify-self: start; max-width: 100%; }
+.gl-h b { font-weight: 700; }
+.gl-l { grid-column: 1; font-size: 14.5px; }
+.gl-l.good { color: var(--good); }
+.gl-l.warn { color: var(--warn); }
+.gl-l.bad { color: var(--bad); }
+.gl-s { grid-column: 1; font-size: 13px; color: var(--muted); }
+.gl-body { display: grid; gap: 8px; padding: 2px 14px 14px; }
+.gl-body .meter { border-color: var(--line); background: var(--bg); }
 .flight { display: grid; grid-template-columns: 1fr auto; gap: 2px 10px; padding: 10px 12px; border: 1px solid var(--line); border-radius: 12px; background: var(--surface); }
 .flight .fl-sub { color: var(--muted); font-size: 13px; }
 .pt { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 2px 10px; padding: 10px 12px 10px 14px; border: 1px solid var(--line); border-left: 4px solid var(--line); border-radius: 12px; background: var(--surface); }
