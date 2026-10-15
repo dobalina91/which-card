@@ -191,7 +191,7 @@ select { padding: 9px 12px; border: 1.5px solid var(--line); border-radius: 12px
 .cp-mini-name { align-self: end; font: 800 21px/1 var(--f-display); letter-spacing: -0.015em; }
 .cp-info { display: grid; gap: 6px; min-width: 0; }
 .cp-label { font: 600 11.5px/1.3 var(--f-body); letter-spacing: 0.07em; text-transform: uppercase; color: var(--muted); }
-.cp-rate { font: 800 46px/0.9 var(--f-display); letter-spacing: -0.03em; color: var(--ink); }
+.cp-rate { font: 800 46px/0.9 var(--f-display); letter-spacing: -0.03em; color: var(--ink); white-space: nowrap; }
 .cp-rate small { font-size: 0.5em; letter-spacing: 0; }
 .cp-rate.fare { font-size: 34px; }
 .cp-back { font: 500 13px/1.3 var(--f-data); color: var(--muted); }

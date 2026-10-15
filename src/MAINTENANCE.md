@@ -68,8 +68,9 @@ partner may use: `points` docs whose `users` include `"b"`, and the confirmed Ma
 
 Balances are documents in the store's `points` collection, one per programme and person: `program` (a key of
 `PROGRAMS` in `engine.js`), `owner` ("a" or "b"), `users` (who may spend it, default the owner), `balance`,
-`expiring` ([{ amount, on }]), `expiresOn` (whole balance), `vouchers`, `progress`, `note`, `asOf`. Update them from
-the screenshots the owner sends. `PROGRAMS` holds what a point is worth in HK$ (`perHkd`, `hkdEach`, an estimate for
+`expiring` ([{ amount, on }]), `expiresOn` (whole balance), `vouchers`, `progress`, `note`, `asOf`, and `seenUntil`
+(set by "Got it" on an expiry alert: what runs out by that date stays quiet). Update them from the screenshots the
+owner sends. `PROGRAMS` holds what a point is worth in HK$ (`perHkd`, `hkdEach`, an estimate for
 airline miles), the least needed to use it (`min`) and where it can be spent (`at`): the page suggests a balance
 before the card only where it can be spent and only when it reaches `min`.
 
@@ -103,7 +104,8 @@ confirm the change; otherwise report it as "to watch". Add or adjust a test for 
 6. **Hong Kong Tramways**: HK$2.30 with a Visa card, HK$3.30 otherwise (`CATS.tram`).
 7. **Taobao through AlipayHK**: Taobao's fee when a card pays (1.5%, 1.3% for Hang Seng cards), 1% from the
    AlipayHK balance (`CATS.taobao`). Pinduoduo through AlipayHK: no fee known (`wallet_buy`).
-8. **Rently**: 8,400 Max Miles a month for the first 12 payments, then 5,250; FPS by the 12th (`rently`).
+8. **Rently**: 8,400 Max Miles a month for the first 12 payments, then 5,250; FPS by the 12th (`rently`). The
+   Which card answer for rent is FPS to Rently, valued with these miles.
 9. **HeyMax**: value of a Max Mile in FlyAnywhere (`miles.rate`; whole tickets only, claim within 31 days), Visa-only
    offers, and the shopping rates in `HEYMAX` when heymax.ai shows them (they were read from the app).
 10. **Offers** in `PROMOS`: remove the ones past their `until` date, update dates that were extended.

@@ -391,7 +391,7 @@
         users: Array.isArray(p.users) && p.users.length ? p.users : [p.owner || "a"],
         unit: prog.unit || (prog.kind === "miles" ? "miles" : "points"), balance, value, runs, next: runs[0] || null,
         min, usable, short: usable === false ? Math.max(0, Math.ceil(min - balance)) : 0, use: p.use || prog.use || "",
-        progress: p.progress || "", note: p.note || "", asOf: p.asOf || "",
+        progress: p.progress || "", note: p.note || "", asOf: p.asOf || "", seen: p.seenUntil || "",
       });
     }
     // Shop programmes first, then miles; within each, what runs out first.
@@ -441,15 +441,16 @@
     return countLabel(x.amount) + " " + (row.word || (row.kind === "miles" ? "miles" : "points"));
   }
   const runVerb = (row, x) => (x.voucher ? " ends " : (row.unit === "HK$" || row.unit === "RC" || x.amount === 1 ? " expires " : " expire "));
-  // What runs out within `horizon` days. Under HK$5 is only information.
+  // What runs out within `horizon` days. Under HK$5 is only information. "Got it" on an alert sets the balance's
+  // `seenUntil` to that date: what runs out by then stays quiet, anything later alerts again.
   function pointsAlerts(rows, horizon) {
     const out = [];
     for (const r of rows || []) {
       for (const x of r.runs) {
-        if (x.daysLeft > (horizon || 30)) continue;
+        if (x.daysLeft > (horizon || 30) || (r.seen && x.on <= r.seen)) continue;
         const small = x.value != null && x.value < 5;
         const verb = runVerb(r, x);
-        out.push({ level: small ? "info" : (x.daysLeft <= 7 ? "bad" : "warn"), kind: "points", id: r.id, owner: r.owner,
+        out.push({ level: small ? "info" : (x.daysLeft <= 7 ? "bad" : "warn"), kind: "points", id: r.id, owner: r.owner, on: x.on,
           text: r.name + ": " + runLabel(r, x) + verb + (x.daysLeft === 0 ? "today" : "on " + dayLabel(x.on)), sub: r.note });
       }
     }
@@ -706,6 +707,17 @@
         fee = feeFor(0.01);
         break;
       }
+      case "fps": {
+        // Rent paid to Rently by FPS: its Max Miles (the promo amount for the first payments), at their FlyAnywhere value.
+        if (!cat.rent) break;
+        const r = cfg.rently || {};
+        const miles = (st.rentN || 0) < (Number(r.promoPayments) || 0) ? Number(r.promoMiles) || 0 : Number(r.standardMiles) || 0;
+        const value = miles * ((cfg.miles && cfg.miles.rate) || 0.12);
+        const base = amt || Number(r.amount) || 0;
+        rebate = base ? value / base : 0;
+        why.push("Rently gives " + countLabel(miles) + " Max Miles for each rent paid by FPS (about " + hkd(value) + ")");
+        break;
+      }
       case "debit": { why.push("No fee when you pay from a currency balance in Global Wallet"); break; }
       case "cash": { why.push("Cash in the local currency, changed in Hong Kong at a better rate than the cards"); break; }
       default: break;
@@ -752,6 +764,7 @@
     const red = {}, hsm = {}, rh = {}, wel = {}, tgm = {}, tgx = {};
     return {
       red, hsm, rh, wel, tgm, tgx,
+      rentN: 0, // rent payments to Rently so far
       redUse: (acct, m) => (red[acct] && red[acct][m]) || { online: 0, red8: 0 },
       hsMonth: (card, m) => (hsm[card] && hsm[card][m]) || { spend: 0, extra: 0 },
       redHotYtd: (p, y) => (rh[p] && rh[p][y]) || 0,
@@ -778,6 +791,7 @@
     if (!cat || !def) return;
     const amt = Number(t.amount) || 0;
     const m = ym(t.date);
+    if (cat.rent && def.kind === "fps") st.rentN++;
     if (def.kind === "red") {
       const a = st.red[t.card] || (st.red[t.card] = {});
       const u = a[m] || (a[m] = { online: 0, red8: 0 });
@@ -823,6 +837,7 @@
     const ids = ["easy_a", "easy_b", "citi", "hs_a", "hs_b", "red_a", "red_b"].filter((id) => usableBy(id, payer, cfg, date));
     if (cat.fx && usableBy("citiplus", payer, cfg, date)) ids.push("citiplus");
     if (cat.abroad) ids.push("cash");
+    if (cat.rent) ids.push("fps");
     return ids;
   }
   function hsMonthMode(payer, date, cfg, openW) {

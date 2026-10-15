@@ -307,6 +307,18 @@ check("...Trip Coins estimated until the credited figure is in: 0.24% of a HK$5,
 check("...a hotel: 0.5%; not on another site", E.audit([T({ id: "c4", date: "2026-10-14", card: "red_a", category: "online_hk", amount: 2000, merchant: "Trip.com" }), T({ id: "c5", date: "2026-10-14", card: "red_a", category: "online_hk", amount: 2000, merchant: "Trip.company.example" })], base).byId.c4.points.toFixed(2) + " " + E.audit([T({ id: "c5", date: "2026-10-14", card: "red_a", category: "online_hk", amount: 2000, merchant: "Trip.company.example" })], base).byId.c5.points, "10.00 0");
 check("...airline miles in earn are not counted", E.audit([T({ id: "c2", date: "2026-10-14", card: "red_a", category: "online_hk", amount: 1000, earn: { asiamiles: 1000 } })], base).byId.c2.back.toFixed(2), "40.00");
 
+// Rent through Rently: FPS, for its Max Miles, never a card. (Test figures.)
+const rentCfg = E.deepMerge(base, { rently: { amount: 20000 } });
+r = rec(rentCfg, { catId: "rent", amount: 20000 });
+check("Rent: FPS to Rently, 8,400 Max Miles = HK$1,008 on HK$20,000", r.pick.id + " " + (r.pick.net * 20000).toFixed(0), "fps 1008");
+check("...without the amount, the rate from the rent in settings", E.pct(rec(rentCfg, { catId: "rent" }).pick.net), "5%");
+const rent12 = Array.from({ length: 12 }, (_, i) => T({ date: E.addDays("2026-10-12", i * 31), card: "fps", category: "rent", amount: 20000 }));
+check("...after 12 payments, 5,250 Max Miles = HK$630", (rec(rentCfg, { date: "2027-10-01", catId: "rent", amount: 20000 }, rent12).pick.net * 20000).toFixed(0), "630");
+// Points alerts: "Got it" quiets what runs out by that date, not what comes later.
+const seenRows = E.pointsSummary([{ id: "am", program: "asiamiles", owner: "a", balance: 7500, expiresOn: "2026-10-31", seenUntil: "2026-10-31" },
+  { id: "ms", program: "msblue", owner: "a", balance: 3, expiring: [{ amount: 1, on: "2026-10-28" }, { amount: 1, on: "2026-11-10" }], seenUntil: "2026-10-28" }], "2026-10-15");
+check("Points alert dismissed until its date; a later one still shows", E.pointsAlerts(seenRows, 30).map((a) => a.id + " " + a.on).join(), "ms 2026-11-10");
+
 // HSBC Travel Guru (GO, 3%): HSBC cards beat cash in shops abroad, as a target to reach.
 const tgCfg = E.deepMerge(base, { travelGuru: { a: "go" } });
 r = rec(tgCfg, { date: "2026-10-25", catId: "abroad_eea", amount: 1000 });
