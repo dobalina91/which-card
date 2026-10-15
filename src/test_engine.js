@@ -305,6 +305,9 @@ check("Back with earn: Red 4% on HK$5,000 + 100 Max Miles + 200 Trip Coins = 200
 check("...Trip Coins estimated until the credited figure is in: 0.24% of a HK$5,000 flight = HK$12",
   E.audit([T({ id: "c3", date: "2026-10-14", card: "red_a", category: "online_hk", amount: 5000, merchant: "Trip.com · ticket", flags: { flight: 1 } })], base).byId.c3.points.toFixed(2), "12.00");
 check("...a hotel: 0.5%; not on another site", E.audit([T({ id: "c4", date: "2026-10-14", card: "red_a", category: "online_hk", amount: 2000, merchant: "Trip.com" }), T({ id: "c5", date: "2026-10-14", card: "red_a", category: "online_hk", amount: 2000, merchant: "Trip.company.example" })], base).byId.c4.points.toFixed(2) + " " + E.audit([T({ id: "c5", date: "2026-10-14", card: "red_a", category: "online_hk", amount: 2000, merchant: "Trip.company.example" })], base).byId.c5.points, "10.00 0");
+check("yuu: 1 point per HK$1 at Wellcome = 0.5%, in the answer and on the expense",
+  E.earnAt("Wellcome", 400, "other").map((x) => x.program + " " + x.value.toFixed(2)).join() + " / " + E.audit([T({ id: "y1", date: "2026-10-14", card: "easy_a", category: "grocery", amount: 400, merchant: "Wellcome (store 12)" })], base).byId.y1.points.toFixed(2), "yuu 2.00 / 2.00");
+check("...not at a shop outside yuu", E.audit([T({ id: "y2", date: "2026-10-14", card: "easy_a", category: "grocery", amount: 400, merchant: "Circle K" })], base).byId.y2.points, 0);
 check("...airline miles in earn are not counted", E.audit([T({ id: "c2", date: "2026-10-14", card: "red_a", category: "online_hk", amount: 1000, earn: { asiamiles: 1000 } })], base).byId.c2.back.toFixed(2), "40.00");
 
 // Rent through Rently: FPS, for its Max Miles, never a card. (Test figures.)

@@ -75,10 +75,16 @@ airline miles), the least needed to use it (`min`) and where it can be spent (`a
 before the card only where it can be spent and only when it reaches `min`.
 
 In the Spending tab each expense shows what it gave back in HK$: card rewards minus fees, plus Max Miles at their
-FlyAnywhere value (the rent's, from Rently, and those HeyMax tracked) and shop points such as Trip Coins. Put what a
+FlyAnywhere value (the rent's, from Rently, and those HeyMax tracked) and shop points such as Trip Coins and yuu. Put what a
 purchase earned besides the card in the expense's `earn`, per programme: `{ "heymax": 150, "tripcoins": 200 }`
-(older expenses may still have `heymaxMiles`). Where a programme pays on every booking (`earn` rates in `PROGRAMS`,
-Trip Coins on Trip.com), the page estimates it until the credited figure is put in. Airline miles are not counted.
+(older expenses may still have `heymaxMiles`). Where a programme pays on every purchase (`earn` rates in `PROGRAMS`:
+Trip Coins on Trip.com, yuu at its partners), the page estimates it until the credited figure is put in. Airline
+miles are not counted.
+
+Expenses come from the bank's emails (HSBC transaction notifications, statements) that the owner's Gmail filter puts
+in the "Banking" label: import them when the owner asks, not on a schedule. Skip card-verification charges (HK$1 when
+a card is linked to an app such as HeyMax) and their refunds. Only plane tickets are logged from the Which card tab,
+so Status can follow their FlyAnywhere claim.
 Travel sites (Trip.com, Expedia) ask whether the purchase is a flight: HeyMax pays much less on flights (`flightPer`
 in `HEYMAX`), and Trip Coins too.
 
@@ -114,7 +120,7 @@ confirm the change; otherwise report it as "to watch". Add or adjust a test for 
     current and add any other site known to charge Mastercard and Visa differently.
 12. **Points and miles** (`points` in the store): report what expires within the next two months. The page itself
     alerts 30 days ahead. Re-check the values and minimums in `PROGRAMS`: MoneyBack 50 points = HK$1; yuu 200 points =
-    HK$1; RewardCash to MoneyBack $1 = 50 points (HSBC Reward+), to Asia Miles $1 = 10 miles from $40; Asia Miles
+    HK$1, earned at 1 point per HK$1; RewardCash to MoneyBack $1 = 50 points (HSBC Reward+), to Asia Miles $1 = 10 miles from $40; Asia Miles
     7,000 one-way up to 750 miles on Cathay; Qatar Avios 6,000 up to 650 miles on partners; Turkish 35,000 Asia to
     Türkiye (promotion); Flying Blue and Miles & More Cash & Miles (Miles & More from 3,000); Delta Pay with Miles from
     5,000; Trip Coins 100 = US$1 on any Trip.com booking, no minimum, valid 18 months, earned at 0.2% on flights and

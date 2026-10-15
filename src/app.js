@@ -413,12 +413,14 @@
       otherPromos.map(promoLine).join("") +
       '<div class="section-h"><span>Every card here</span><span class="mono">' + esc(amount ? "on " + E.hkd(amount) : "per HK$100") + '</span></div><div class="alts">' + all + "</div></details>";
 
+    // Everyday expenses come in from the bank's emails. A plane ticket is logged on the spot, so Status can follow
+    // what FlyAnywhere pays back within 31 days of booking.
     let actions = "";
     if (SOLO) actions = '<div class="actions"><button type="button" class="btn" data-act="ask-help">' + esc(askLabel()) + "</button></div>";
-    else if (canWrite()) {
-      actions = p.id === "cash"
-        ? '<div class="actions"><button type="button" class="btn" data-act="log-other">Log a card payment</button></div>'
-        : '<div class="actions"><button type="button" class="btn primary" data-act="log-pick" data-card="' + p.id + '">Paid with ' + esc(shortCard(p.id)) + '</button><button type="button" class="btn" data-act="log-other">Paid another way</button></div>';
+    else if (canWrite() && tripKind(sel) === "flight") {
+      actions = '<p class="hint">Log the ticket now: Status then follows its FlyAnywhere claim (31 days).</p>' + (p.id === "cash"
+        ? '<div class="actions"><button type="button" class="btn" data-act="log-other">Log the ticket</button></div>'
+        : '<div class="actions"><button type="button" class="btn primary" data-act="log-pick" data-card="' + p.id + '">Paid with ' + esc(shortCard(p.id)) + '</button><button type="button" class="btn" data-act="log-other">Paid another way</button></div>');
     }
     const hot = notes.filter((n) => n.hot);
     return '<div class="result">' +
@@ -655,21 +657,90 @@
       '<div class="m-nums">' + esc(E.hkd(m.used)) + " of " + esc(E.hkd(m.cap)) + " spent</div>" +
       '<div class="m-detail">' + esc(foot) + "</div></div>";
   }
-  function metersHtml(list) {
-    const th = list.filter((m) => m.kind === "threshold");
-    // The partner's spending is only here once their statements are imported: their caps show once something is logged.
-    const isB = (m) => (E.CARDS[m.card] || {}).holder === "b";
-    const caps = list.filter((m) => m.kind === "cap" && (!isB(m) || m.used > 0));
-    const hiddenB = list.some((m) => m.kind === "cap" && isB(m) && !(m.used > 0));
-    const c = S.cfg.cards.citi || {}, cw = S.cfg.welcome.citi;
-    const none = c.status === "pending" ? "None running. The Citi welcome bonus (" + E.hkd(cw.target) + " in " + cw.days + " days) starts the day the card is approved." : "None running right now.";
-    return '<div class="sec"><div class="section-h"><span>Thresholds to hit</span><span class="mono">' + esc(E.monthLabel(E.ym(S.today))) + "</span></div>" +
-      '<p class="hint">A minimum to spend on the card, in time, to unlock a reward.</p></div>' +
-      (th.length ? '<div class="meters">' + th.map(meterHtml).join("") + "</div>" : '<p class="empty">' + esc(none) + "</p>") +
-      '<div class="sec"><div class="section-h"><span>Caps on bonus rates</span></div>' +
-      '<p class="hint">The bonus rate only applies up to the cap. Above it, the card earns its basic rate.</p></div>' +
-      '<div class="meters">' + caps.map(meterHtml).join("") + "</div>" +
-      (hiddenB ? '<p class="hint">' + esc(nameOf("b") ? nameOf("b") + "’s caps" : "The other caps") + " appear here once that card spending is logged (send Claude the statements).</p>" : "");
+  // Below the actions, one line per block, the details on tap: the Reds' caps, thresholds (Travel Guru, welcome
+  // bonuses, the Hang Seng month), Red Hot, Max Miles, rent, points, cards. Open blocks stay open when the page redraws.
+  function glanceHtml(s, wasOpen) {
+    const rows = [];
+    const head = (h, line, sub, toneCls) => '<span class="gl-h">' + h + '</span><span class="gl-l' + (toneCls ? " " + toneCls : "") + '">' + esc(line) + "</span>" +
+      (sub ? '<span class="gl-s">' + esc(sub) + "</span>" : "");
+    const row = (key, h, line, sub, body, toneCls) => rows.push(body
+      ? '<details class="gl" data-key="' + key + '"' + (wasOpen.has(key) ? " open" : "") + "><summary>" + head(h, line, sub, toneCls) + '</summary><div class="gl-body">' + body + "</div></details>"
+      : '<div class="gl"><div class="gl-row">' + head(h, line, sub, toneCls) + "</div></div>");
+    const pillOf = (id) => cardPill(id, shortWithHolder(id));
+    // The partner's caps show once their spending is logged.
+    const unusedB = (m) => (E.CARDS[m.card] || {}).holder === "b" && !(m.used > 0);
+    const resets = (m) => E.dayLabel(m.resets) + (m.resets.slice(0, 4) !== S.today.slice(0, 4) ? " " + m.resets.slice(0, 4) : "");
+    for (const id of ["red_a", "red_b"]) {
+      const ms = s.meters.filter((m) => m.card === id && m.kind === "cap");
+      if (!ms.length || ms.every(unusedB)) continue;
+      const on = ms.find((m) => m.key === id + "_on"), r8 = ms.find((m) => m.key === id + "_r8");
+      const line = on.left > 0 ? E.hkd(on.left) + " left at 4% online" : "4% online used up: 0.4% until " + resets(on);
+      const sub = (r8.left > 0 ? E.hkd(r8.left) + " left at 8% in partner shops" : "8% partner cap used up") + " · starts again on " + resets(on);
+      row("cap_" + id, pillOf(id), line, sub, ms.map(meterHtml).join(""), on.left > 0 ? "" : "warn");
+    }
+    for (const m of s.meters.filter((x) => x.kind === "threshold")) {
+      // Travel Guru counts every HSBC card of that person, so it is named rather than shown as one card.
+      const tg = m.key.startsWith("tg_");
+      const title = tg ? m.title.replace(/^Travel Guru /, "") : m.title;
+      const h = tg ? "<b>" + esc("Travel Guru" + (nameOf(m.key.slice(3)) ? " · " + nameOf(m.key.slice(3)) : "")) + "</b>" : pillOf(m.card);
+      const line = m.reached ? title + ": reached" : (m.closed ? title + ": closed, " + E.hkd(m.left) + " short" : title + ": " + E.hkd(m.left) + " to spend" + (tg ? " in shops abroad" : "") + " by " + E.dayLabel(m.deadline));
+      row("th_" + m.key, h, line, (m.reached ? "Unlocked: " : "Unlocks ") + m.unlocks + (tg ? ", on HSBC cards" : ""), meterHtml(m), m.reached ? "good" : (m.closed ? "bad" : (m.state === "warn" ? "warn" : "")));
+    }
+    for (const m of s.meters.filter((x) => x.key.startsWith("rh_"))) {
+      if (unusedB(m)) continue;
+      const cat = (S.cfg.redHot[m.key.slice(3)] || {}).cat;
+      row("rh_" + m.card, pillOf(m.card), m.title + ": " + E.hkd(m.collected, m.collected < 100 ? 2 : 0) + " this year",
+        "2.4% at " + (RH_WHERE[cat] || "its category") + ", up to " + E.hkd(m.cap) + " a year", meterHtml(m), "");
+    }
+    // Max Miles, with the plane tickets they may pay back. Claimable or claimed tickets stay a month after the
+    // deadline; the ones the miles can't cover, until it.
+    const mi = s.miles;
+    const flights = s.flights.filter((f) => f.daysLeft >= (f.claimed || f.canClaim ? -31 : 0)).slice(0, 8);
+    const flightsHtml = flights.length
+      ? '<div class="list">' + flights.map((f) => '<div class="flight"><span>' + esc(f.merchant || "Flight") + ' <span class="muted">· ' + esc(shortWithHolder(f.card)) + '</span></span><span class="mono">' + esc(E.hkd(f.amount)) + '</span><span class="fl-sub">' + esc(flightState(f)) + '</span><span><button type="button" class="linkish" data-act="open-tx" data-id="' + esc(f.id) + '">Edit</button></span></div>').join("") + "</div>"
+      : '<p class="hint">Plane tickets logged from the Which card tab show here, with what FlyAnywhere can pay back.</p>';
+    row("miles", "<b>Max Miles</b>", fmtCount(mi.balance) + " ≈ " + money(mi.value) + (mi.pending ? " · " + fmtCount(mi.pending) + " on the way" : ""),
+      "FlyAnywhere pays back a whole ticket up to " + money(mi.value) + (flights.length ? " · " + flights.length + (flights.length === 1 ? " ticket" : " tickets") + " followed" : ""), flightsHtml, "");
+    // Rent through Rently.
+    const rn = s.rently, rc = S.cfg.rently;
+    const nextPay = (d) => { const y = Number(d.slice(0, 4)), mo = Number(d.slice(5, 7)); return (mo === 12 ? y + 1 : y) + "-" + pad(mo === 12 ? 1 : mo + 1) + d.slice(7); };
+    row("rent", "<b>Rent via Rently</b>",
+      rn.paidThisCycle ? "Paid for " + E.dayLabel(rn.nextDue) + " · next FPS by " + E.dayLabel(nextPay(rn.payBy)) : "Send the FPS by " + E.dayLabel(rn.payBy),
+      (rn.promoLeft > 0 ? rn.promoLeft + " promo months left: " + fmtCount(rc.promoMiles) : fmtCount(rc.standardMiles)) + " Max Miles a month",
+      !rn.paidThisCycle && canWrite() ? '<div><button type="button" class="btn small" data-act="log-rent">Log the payment</button></div>' : "", rn.paidThisCycle ? "" : "warn");
+    // Points and miles.
+    const pr = S.pointRows;
+    if (pr.length) {
+      const runs = pr.filter((r) => r.next && !r.next.voucher).sort((x, y) => (x.next.on < y.next.on ? -1 : 1));
+      const first = runs[0];
+      row("points", "<b>Points and miles</b>", pr.filter((r) => r.usable === true).length + " of " + pr.length + " usable now",
+        first ? "Next to expire: " + first.name + ", " + E.runLabel(first, first.next) + " on " + E.dayLabel(first.next.on) : "", pointsListHtml(), "");
+    }
+    // Cards.
+    const ids = ["red_a", "easy_a", "citi", "hs_a", "citiplus", "red_b", "easy_b", "hs_b"];
+    const st = (id) => (S.cfg.cards[id] || {}).status;
+    const names = (status) => Array.from(new Set(ids.filter((id) => st(id) === status).map((id) => E.cardName(id)))).join(", ");
+    const cardsLine = [ids.filter((id) => st(id) === "active").length + " active", names("pending") ? names("pending") + " applied" : "", names("planned") ? names("planned") + " to apply" : ""].filter(Boolean).join(" · ");
+    row("cards", "<b>Cards</b>", cardsLine, "", cardsBody(), "");
+    return '<div class="section-h"><span>At a glance</span><span class="mono">' + esc(E.monthLabel(E.ym(S.today))) + "</span></div>" +
+      '<div class="glance">' + rows.join("") + "</div>";
+  }
+  function cardsBody() {
+    const cardIds = ["red_a", "easy_a", "citi", "hs_a", "citiplus", "red_b", "easy_b", "hs_b"];
+    const lines = cardIds.map((id) => {
+      const c = S.cfg.cards[id] || {};
+      const on = c.status === "active";
+      const date = c.since || c.approvedOn || c.issuedOn;
+      let state = STATUS_LABEL[c.status] || "Unknown";
+      if (on && date) state += " since " + E.dayLabel(date);
+      if (id === "citi" && on) state += c.suppCard ? " · extra card for " + (nameOf("b") || "the partner") : " · no extra card yet";
+      if ((id === "hs_a" || id === "hs_b") && on) state += c.funRegistered ? " · +FUN registered" : " · register for +FUN";
+      return '<div class="card-line">' + cardPill(id, cardLabel(id)) + '<span class="cl-state' + (on ? " on" : "") + '">' + esc(state) + "</span></div>";
+    }).join("");
+    const rh = ["a", "b"].map((p) => (nameOf(p) || (p === "a" ? "Person A" : "Person B")) + ": " + (RH_LABEL[(S.cfg.redHot[p] || {}).cat || ""] || "—")).join(" · ");
+    return '<div class="cards-list">' + lines + "</div>" +
+      '<p class="hint">Red Hot Rewards 5X: ' + esc(rh) + ". Rates as checked in October 2026; the banks' terms decide in the end.</p>" +
+      '<div><button type="button" class="btn small" data-act="settings">Edit cards and settings</button></div>';
   }
   function todoHtml(t) {
     const late = !t.done && t.due && t.due < S.today;
@@ -700,44 +771,19 @@
     const done = S.todos.filter((t) => t.done).sort(byDue);
     const wasOpen = new Set(Array.from(document.querySelectorAll("#tab-status details[open]"), (d) => d.dataset.key));
     const more = (key, label, items) => '<details class="more" data-key="' + key + '"' + (wasOpen.has(key) ? " open" : "") + "><summary>" + esc(label) + '</summary><ul class="list">' + items.map(todoHtml).join("") + "</ul></details>";
-    const SHOW = 5;
+    // The next three to-dos; the rest folded.
+    const SHOW = 3;
     const todoBlock = (upcoming.length || done.length)
       ? '<div class="section-h"><span>Coming up</span><span class="mono">' + upcoming.length + " to do</span></div>" +
         (upcoming.length ? '<ul class="list">' + upcoming.slice(0, SHOW).map(todoHtml).join("") + "</ul>" : "") +
         (upcoming.length > SHOW ? more("later", (upcoming.length - SHOW) + " more", upcoming.slice(SHOW)) : "") +
         (done.length ? more("done", "Done (" + done.length + ")", done) : "")
       : "";
-    // Claimable or claimed tickets stay a month after the deadline; the ones the miles can't cover, until it.
-    const flights = s.flights.filter((f) => f.daysLeft >= (f.claimed || f.canClaim ? -31 : 0)).slice(0, 8);
-    const cardIds = ["red_a", "easy_a", "citi", "hs_a", "citiplus", "red_b", "easy_b", "hs_b"];
-    const cardsHtml = cardIds.map((id) => {
-      const c = S.cfg.cards[id] || {};
-      const on = c.status === "active";
-      const date = c.since || c.approvedOn || c.issuedOn;
-      let state = STATUS_LABEL[c.status] || "Unknown";
-      if (on && date) state += " since " + E.dayLabel(date);
-      if (id === "citi" && on) state += c.suppCard ? " · extra card for " + (nameOf("b") || "the partner") : " · no extra card yet";
-      if ((id === "hs_a" || id === "hs_b") && on) state += c.funRegistered ? " · +FUN registered" : " · register for +FUN";
-      return '<div class="card-line">' + cardPill(id, cardLabel(id)) + '<span class="cl-state' + (on ? " on" : "") + '">' + esc(state) + "</span></div>";
-    }).join("");
-    const rh = ["a", "b"].map((p) => (nameOf(p) || (p === "a" ? "Person A" : "Person B")) + ": " + (RH_LABEL[(S.cfg.redHot[p] || {}).cat || ""] || "—")).join(" · ");
-    const mi = s.miles, rn = s.rently;
     $("#tab-status").innerHTML =
       '<div class="section-h"><span>Needs attention</span>' + (alerts.length ? '<span class="mono">' + alerts.length + "</span>" : "") + "</div>" +
       '<div class="alerts">' + (alerts.length ? alerts.map(alertHtml).join("") : '<p class="empty">Nothing needs attention. Wrong-card payments and deadlines will show up here.</p>') + "</div>" +
       todoBlock +
-      metersHtml(s.meters) +
-      '<div class="section-h"><span>Max Miles and rent</span></div>' +
-      '<div class="facts">' +
-        '<div class="fact"><div class="f-k">Max Miles to use</div><div class="f-v">' + esc(Math.round(mi.balance).toLocaleString("en-US")) + '</div><div class="f-s">≈ ' + esc(E.hkd(mi.value)) + " at HK$" + mi.rate.toFixed(2) + (mi.pending ? " · " + esc(Math.round(mi.pending).toLocaleString("en-US")) + " on the way" : "") + "</div></div>" +
-        '<div class="fact"><div class="f-k">Next rent via Rently</div><div class="f-v">' + esc(E.dayLabel(rn.nextDue)) + '</div><div class="f-s">' + (rn.paidThisCycle ? "Paid for this cycle" : "Send the FPS by " + esc(E.dayLabel(rn.payBy))) + " · " + rn.promoLeft + " promo months left</div>" +
-          (!rn.paidThisCycle && canWrite() ? '<button type="button" class="linkish" data-act="log-rent">Log the payment</button>' : "") + "</div>" +
-      "</div>" +
-      (flights.length ? '<div class="list">' + flights.map((f) => '<div class="flight"><span>' + esc(f.merchant || "Flight") + ' <span class="muted">· ' + esc(shortWithHolder(f.card)) + '</span></span><span class="mono">' + esc(E.hkd(f.amount)) + '</span><span class="fl-sub">' + esc(flightState(f)) + '</span><span><button type="button" class="linkish" data-act="open-tx" data-id="' + esc(f.id) + '">Edit</button></span></div>').join("") + "</div>" : "") +
-      pointsHtml() +
-      '<div class="section-h"><span>Cards</span><button type="button" class="linkish" data-act="settings">Edit</button></div>' +
-      '<div class="cards-list">' + cardsHtml + "</div>" +
-      '<p class="hint">Red Hot Rewards 5X: ' + esc(rh) + ". Rates as checked in October 2026; the banks' terms decide in the end.</p>";
+      glanceHtml(s, wasOpen);
   }
 
   /* ---------- Spending ---------- */
@@ -805,7 +851,7 @@
     const chips = Object.keys(byCard).sort((a, b) => byCard[b] - byCard[a]).map((id) => cardPill(id, shortCard(id) + " · " + E.hkd(byCard[id]))).join("");
     const empty = S.dbState === "off"
       ? "Open this page in Claude, signed in, to see your shared spending."
-      : (!S.txLoaded ? "Loading…" : "Nothing paid" + (who ? " by " + who : "") + " in " + E.monthLabel(m) + ". After paying, tap “Paid with…” on the Which card tab, or Add expense. Send Claude the card statements and it fills this in.");
+      : (!S.txLoaded ? "Loading…" : "Nothing paid" + (who ? " by " + who : "") + " in " + E.monthLabel(m) + " yet. Ask Claude to import the bank emails in the Banking label, or tap Add expense.");
     const both = all.spent !== me.spent || all.back !== me.back
       ? '<p class="hint together">Together: ' + esc(E.hkd(all.spent)) + " spent, about " + esc(money(all.back)) + " back after fees.</p>" : "";
     $("#tab-spend").innerHTML =
@@ -1201,7 +1247,7 @@
     return { html, value };
   }
   // Status: each balance with its HK$ value, green when it can be used, red with what is missing, grey when unknown.
-  function pointsHtml() {
+  function pointsListHtml() {
     const rows = S.pointRows;
     if (!rows.length) return "";
     const line = (r) => {
@@ -1219,9 +1265,8 @@
         (r.progress ? '<span class="pt-sub">' + esc(r.progress) + "</span>" : "") + "</div>";
     };
     const asOf = rows.map((r) => r.asOf).filter(Boolean).sort()[0];
-    return '<div class="section-h"><span>Points and miles</span>' + (asOf ? '<span class="mono">as of ' + esc(E.dayLabel(asOf)) + "</span>" : "") + "</div>" +
-      '<div class="list pts">' + rows.map(line).join("") + "</div>" +
-      '<p class="hint">Airline miles: HK$ value estimated for their cheapest use. Send Claude a screenshot of an app to update a balance.</p>';
+    return '<div class="list pts">' + rows.map(line).join("") + "</div>" +
+      '<p class="hint">' + (asOf ? "Balances as of " + esc(E.dayLabel(asOf)) + ". " : "") + "Airline miles: HK$ value estimated for their cheapest use. Send Claude a screenshot of an app to update a balance.</p>";
   }
   async function copyText(text, el) {
     try { await navigator.clipboard.writeText(text); toast("Link copied."); }

@@ -273,7 +273,9 @@
   const MONEYBACK_SHOPS = ["PARKnSHOP", "Fortress", "Watsons", "TASTE", "FUSION", "GREAT FOOD HALL", "food le parc", "PNS eShop", "Fortress eShop", "Watson's Wine"];
   const PROGRAMS = {
     moneyback: { name: "MoneyBack", useName: "MoneyBack points", kind: "shop", perHkd: 50, min: 50, use: "Pay with points at the till (50 points = HK$1).", at: MONEYBACK_SHOPS.concat(["3 Hong Kong"]) },
+    // yuu: 1 point per HK$1 at its partners when the app is scanned, so 0.5% back (`earn`).
     yuu: { name: "yuu", useName: "yuu points", kind: "shop", perHkd: 200, min: 200, use: "Pay with points at the till (200 points = HK$1).",
+      earn: { other: 0.005 },
       at: ["Wellcome", "Market Place", "Oliver's", "7-Eleven", "Mannings", "IKEA", "Maxim's", "Starbucks", "KFC", "Pizza Hut", "PHD (Pizza Hut Delivery)"] },
     dsgroceries: { name: "DS Groceries (DS Fans)", useName: "DS Fans points", kind: "shop", min: null, use: "The DS Fans app lists what the points buy.", at: ["DS Groceries"] },
     msblue: { name: "M&S (Blue)", useName: "Blue balance", kind: "shop", unit: "HK$", min: 0.01, use: "Pay with the Blue balance at the till.", at: ["Marks & Spencer"] },
