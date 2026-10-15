@@ -86,6 +86,8 @@ in the "Banking" label: import them when the owner asks, not on a schedule. Skip
 a card is linked to an app such as HeyMax) and their refunds; a return cancels its purchase; `DCC FEE` lines are left
 to the engine (the category carries the 1%). `AlipayHK*NUCC` is AlipayHK paying in mainland China, charged in HK$
 (`wallet_buy`); `ALP*` or `Alipay*` lines from China are the card used in mainland Alipay, in yuan (`abroad_asia7`).
+Pending lines may already be in (note "Pending on …"): when the posted line arrives, update that expense (the HK$
+of a foreign-currency one was estimated) instead of adding a second one with the same card, date and merchant.
 Only plane tickets are logged from the Which card tab,
 so Status can follow their FlyAnywhere claim.
 Travel sites (Trip.com, Expedia) ask whether the purchase is a flight: HeyMax pays much less on flights (`flightPer`
