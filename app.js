@@ -66,10 +66,14 @@
   ];
   // The Red's 8% partners abroad are in Japan and Korea only.
   const RED8_ABROAD = { jp: "FamilyMart, Suica", kr: "Olive Young, T-money" };
+  // In mainland China AlipayHK charges the card in HK$ (no foreign-currency fee): an e-wallet payment for the cards.
+  const WALLET_ABROAD = { cn: "Mainland China via AlipayHK (QR codes, DiDi, metro)" };
   function quickList() {
     if (!S.ask.abroad) return QUICK_HK;
     const p8 = RED8_ABROAD[S.ask.country];
+    const w = WALLET_ABROAD[S.ask.country];
     return [{ label: "Shops and restaurants in " + countryLabel(), cat: E.abroadCat(countryRegion()) }]
+      .concat(w ? [{ label: w, cat: "wallet_buy" }] : [])
       .concat(p8 ? [{ label: p8, cat: "red8_abroad" }] : [])
       .concat([
         { label: "Website in a foreign currency", cat: "online_fx" },
@@ -1226,7 +1230,6 @@
     const h = sel && E.heymaxFor(sel.name);
     if (!h) return null;
     const link = /^https:\/\//.test(S.priv.links[h.k] || "") ? S.priv.links[h.k] : "";
-    if (SOLO && !link) return null;
     const rate = S.cfg.miles.rate || 0.12;
     const kind = tripKind(sel);
     const on = (per) => (amount ? money(amount / per * rate) : money(100 / per * rate) + " per HK$100");
@@ -1239,8 +1242,9 @@
       what = "about " + on(h.per) + " back on a hotel or tour, " + (h.flightPer ? "about " + on(h.flightPer) : "much less") + " on a flight";
     } else { what = (amount ? "about " : "") + on(h.per) + " back"; value = amount ? amount / h.per * rate : 0; }
     const owner = nameOf("a");
+    // The stand-alone page's owner has the HeyMax app too, signed in to the main account.
     const how = SOLO
-      ? "Use the button, then pay in the page it opens (not in the " + sel.name + " app)." + (owner ? " It goes to " + owner + "'s HeyMax." : "")
+      ? "Start from the HeyMax app" + (owner ? " (" + owner + "'s account)" : "") + (link ? " or the button below" : "") + ", then pay in the page it opens, not in the " + sel.name.replace(/\s*\(.*\)$/, "") + " app."
       : "Start from the HeyMax app before paying, or nothing is tracked.";
     const html = "<b>" + esc("Open " + sel.name + " through HeyMax:") + "</b> " + esc(what + ", on top of the card." + ("flightPer" in h && kind === "" ? " Say which it is above." : "") + " " + how + (h.note ? " " + h.note : "")) +
       (link ? '<div><a class="btn small" href="' + esc(link) + '" target="_blank" rel="noopener noreferrer">Open ' + esc(sel.name) + " via HeyMax</a></div>" : "");
