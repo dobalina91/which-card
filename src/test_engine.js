@@ -220,7 +220,7 @@ fa3 = E.flyAnywhere("2026-10-15", 0, 8500, base, 1);
 check("...covers a flight up to HK$1,020 now", fa3.coverNow + " " + fa3.now, "1020 true");
 const fa4 = E.status([T({ id: "fl3", date: "2026-10-20", card: "red_a", category: "online_hk", amount: 1500, merchant: "Peach", flags: { flight: 1 } }),
   T({ id: "rent", date: "2026-10-12", card: "fps", category: "rent", amount: 20000, merchant: "Rently", miles: 8400 })], E.deepMerge(base, { miles: { base: 100 } }), "2026-10-21");
-check("...Status says from when it can be claimed", (fa4.flights[0].claimFrom || "") + " | " + (fa4.alerts.find((x) => x.kind === "flight") || {}).text, "2026-11-15 | Peach: Max Miles can pay it back from 15 Nov");
+check("...Status says from when it can be claimed", (fa4.flights[0].claimFrom || "") + " | " + (fa4.alerts.find((x) => x.kind === "flight") || {}).text, "2026-11-15 | Peach: HeyMax can pay it back from 15 Nov");
 
 // Loyalty programmes and HeyMax.
 check("PARKnSHOP: MoneyBack, and RewardCash through MoneyBack", E.programsAt("PARKnSHOP").join(), "moneyback,rewardcash");
@@ -278,6 +278,19 @@ check("Lufthansa: Miles & More (3,500 of 3,000)", E.pointsToUse("Lufthansa", row
 check("Turkish Airlines: not enough miles, nothing", E.pointsToUse("Turkish Airlines", rows, "a").length, 0);
 check("Cathay: Asia Miles", E.pointsToUse("Cathay Pacific", rows, "a").map((r) => r.id).join(), "am_a");
 check("Shared balances: usable by both when users says so", E.pointsToUse("Wellcome", E.pointsSummary([{ id: "y", program: "yuu", owner: "a", users: ["a", "b"], balance: 400 }], "2026-10-15"), "b").length, 1);
+
+// HK$ back on each expense: card rewards minus fees, plus Max Miles (HeyMax tracking, the rent's Rently miles).
+const backTx = [
+  T({ id: "b1", date: "2026-10-14", card: "red_a", category: "online_hk", amount: 6800, merchant: "Trip.com", flags: { flight: 1 }, heymaxMiles: 180 }),
+  T({ id: "b2", date: "2026-10-12", card: "fps", category: "rent", amount: 20000, merchant: "Rently" }),
+  T({ id: "b3", date: "2026-10-13", card: "easy_a", category: "home", amount: 500, merchant: "PARKnSHOP", flags: { moneyback: 1 } }),
+  T({ id: "b4", date: "2026-10-13", card: "easy_b", category: "abroad_eea", amount: 1000, merchant: "Shop in Nice", payer: "b" }),
+];
+const ba = E.audit(backTx, base).byId;
+check("Back: Red 4% on HK$6,800 plus 180 Max Miles = HK$272 + HK$21.60", ba.b1.back.toFixed(2), "293.60");
+check("...the rent's 8,400 Max Miles = HK$1,008", ba.b2.back.toFixed(0), "1008");
+check("...easy at PARKnSHOP: Home 5X and MoneyBack, 4% = HK$20", ba.b3.back.toFixed(2), "20.00");
+check("...in shops abroad: fees bigger than rewards", ba.b4.back.toFixed(2), "-15.50");
 
 // HSBC Travel Guru (GO, 3%): HSBC cards beat cash in shops abroad, as a target to reach.
 const tgCfg = E.deepMerge(base, { travelGuru: { a: "go" } });

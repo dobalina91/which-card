@@ -73,6 +73,11 @@ the screenshots the owner sends. `PROGRAMS` holds what a point is worth in HK$ (
 airline miles), the least needed to use it (`min`) and where it can be spent (`at`): the page suggests a balance
 before the card only where it can be spent and only when it reaches `min`.
 
+In the Spending tab each expense shows what it gave back in HK$: card rewards minus fees, plus Max Miles at their
+FlyAnywhere value, from the rent (Rently) and from purchases HeyMax tracked (put the tracked Max Miles in the
+expense's `heymaxMiles`). Airline miles are not counted. Travel sites (Trip.com, Expedia) ask whether the purchase is
+a flight: HeyMax pays much less on flights (`flightPer` in `HEYMAX`).
+
 ## Monthly check of the rules (1st of each month)
 
 Re-verify each rule below against the bank's own page first, then recent articles (MoneyHero, Flyformiles,

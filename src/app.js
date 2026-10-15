@@ -93,7 +93,7 @@
     readOnly: false,
     month: null,
     status: null,
-    ask: { text: "", amount: "", abroad: false, country: store.get("country", "jp"), sel: null, matches: [], claude: { busy: false, msg: "" }, netFee: { mastercard: "", visa: "" } },
+    ask: { text: "", amount: "", abroad: false, country: store.get("country", "jp"), sel: null, matches: [], claude: { busy: false, msg: "" }, netFee: { mastercard: "", visa: "" }, trip: "" },
   };
   S.month = E.ym(S.today);
   if (!SOLO) E.setPeople(store.get("people", null));
@@ -151,7 +151,7 @@
     $("#addBtn").hidden = !(S.tab === "spend" && canWrite());
   }
   function setTab(t) { S.tab = t; store.set("tab", t); renderTabs(); window.scrollTo(0, 0); }
-  function setWho(w) { S.who = w; store.set("who", w); renderHeader(); renderAskBody(); }
+  function setWho(w) { S.who = w; store.set("who", w); renderHeader(); renderAskBody(); renderSpend(); }
 
   /* ---------- Which card ---------- */
   function countryRegion() { return (E.COUNTRIES.find((c) => c.id === S.ask.country) || { region: "other" }).region; }
@@ -174,6 +174,7 @@
     A.sel = sure ? fromMatch(top) : null;
     A.claude = { busy: false, msg: "" };
     A.netFee = { mastercard: "", visa: "" };
+    A.trip = "";
     renderAskBody();
   }
   // Card fees typed from a site's payment page travel with the purchase, so the advice and the check afterwards use them.
@@ -181,10 +182,10 @@
     const mc = parseAmt(S.ask.netFee.mastercard), visa = parseAmt(S.ask.netFee.visa);
     return mc || visa ? { netFee: { mastercard: mc, visa } } : {};
   }
-  const askFlags = (sel) => Object.assign({}, (sel && sel.flags) || {}, netFeeFlags());
+  const askFlags = (sel) => Object.assign({}, (sel && sel.flags) || {}, netFeeFlags(), S.ask.trip === "flight" ? { flight: 1 } : {});
   function clearAsk() {
     const A = S.ask;
-    A.text = ""; A.sel = null; A.matches = []; A.claude = { busy: false, msg: "" }; A.netFee = { mastercard: "", visa: "" };
+    A.text = ""; A.sel = null; A.matches = []; A.claude = { busy: false, msg: "" }; A.netFee = { mastercard: "", visa: "" }; A.trip = "";
     $("#q").value = "";
     $("#qClear").hidden = true;
     renderAskBody();
@@ -240,22 +241,14 @@
     const art = img
       ? '<img class="dc-img ' + img.shape + '" src="' + img.src + '" alt="' + esc(cardLabel(d.id)) + ' card" width="' + img.w + '" height="' + img.h + '">'
       : '<div class="cp-mini ' + tone(d.id) + '" aria-hidden="true"><span class="cp-mini-bank">' + esc(c.bank) + '</span><span class="cf-chip"></span><span class="cp-mini-name">' + esc(c.name) + "</span></div>";
-    const groups = [];
-    for (const x of d.exceptions) {
-      let g = groups.find((y) => y.card === x.card);
-      if (!g) groups.push(g = { card: x.card, items: [] });
-      g.items.push(x);
-    }
-    const xs = groups.map((g) => cardPill(g.card, shortCard(g.card)) + "<span>" + g.items.map((x) =>
-      esc(x.label) + ' <b class="mono">' + esc(x.fare != null ? "HK$" + x.fare.toFixed(2) : money(x.net * 100)) + "</b>").join('<span class="dc-sep"> · </span>') + "</span>").join("");
     let foot = "";
     if (d.next) foot = "From " + E.dayLabel(d.next.from) + ": " + cardName(d.next.id) + (d.next.mode === "welcome" ? ", for its welcome bonus" : (d.next.mode === "hsmonth" ? ", for the Hang Seng month" : "")) + ". Change the default that day.";
     else if (d.coming) foot = "When the " + cardName(d.coming.id) + " arrives, it becomes the default" + (d.coming.mode === "welcome" ? " for its welcome bonus" : "") + ".";
     return '<div class="section-h"><span>Default card' + esc(forWho(" · ")) + "</span>" + (d.next ? '<span class="mono">until ' + esc(E.dayLabel(E.addDays(d.next.from, -1))) + "</span>" : "") + "</div>" +
       '<div class="dc">' +
-        '<div class="dc-main">' + art + '<div class="dc-info"><span class="dc-name">' + esc(cardName(d.id)) + '</span><span class="dc-reason">' + esc(defaultReason(d)) + "</span>" +
+        '<div class="dc-main">' + art + '<div class="dc-info"><span class="dc-name">' + esc(cardName(d.id)) + "</span>" +
+        (d.mode === "welcome" || d.mode === "hsmonth" ? '<span class="dc-reason">' + esc(defaultReason(d)) + "</span>" : "") +
         '<span class="dc-wallet">Set it as the default card in ' + esc(walletOf(S.who)) + ".</span></div></div>" +
-        (xs ? '<div class="dc-xs"><span class="dc-x-h">Use another card for (back per HK$100)</span><div class="dc-xl">' + xs + "</div></div>" : "") +
         (foot ? '<p class="dc-foot">' + esc(foot) + "</p>" : "") +
       "</div>";
   }
@@ -357,7 +350,7 @@
     const steps = [];
     const uses = pointsSteps(sel, amount);
     const fly = flyStep(sel, amount);
-    if (fly) uses.push(fly);
+    if (fly && fly.step) uses.push(fly.step);
     if (uses.length === 1) steps.push(uses[0]);
     else if (uses.length > 1) steps.push('<p class="step-h">Points and miles you can use here</p><ul class="uses">' + uses.map((u) => "<li>" + u + "</li>").join("") + "</ul>");
     const hm = heymaxStep(sel, amount);
@@ -373,6 +366,11 @@
       (scan.length ? '<p class="hint">Scan ' + esc(scan.join(" and ")) + " at the till too.</p>" : "") +
       (backup && p.id !== "cash" ? '<p class="backup">Not accepted? ' + cardPill(backup.id, shortCard(backup.id)) + " " + esc(bk[0] === "Cash" ? "cash" : bk[0] + " " + bk[1].split(":")[0]) + "</p>" : "");
     const total = amount && hm && hm.value > 0 && p.net > 0 ? '<p class="total">In all: about <b>' + esc(money(hm.value + p.net * amount)) + "</b> back.</p>" : "";
+    const flyNote = fly && fly.note ? '<p class="hint">' + esc(fly.note) + "</p>" : "";
+    const tripQ = MAYBE_FLIGHT.includes(sel.name) && !(sel.flags && sel.flags.flight)
+      ? '<div class="trip-kind" role="group" aria-label="What are you buying?"><span>This is</span>' +
+        '<button type="button" class="chip" data-trip="flight" aria-pressed="' + (A.trip === "flight") + '">a flight</button>' +
+        '<button type="button" class="chip" data-trip="other" aria-pressed="' + (A.trip === "other") + '">a hotel or something else</button></div>' : "";
 
     // Details: the reasons in figures, every card, offers for cards not active yet.
     const all = [p].concat(rec.alts).map((o) => { const b = cardBack(o, cat, amount); return '<div class="alt">' + cardPill(o.id, cardLabel(o.id)) + '<span></span><span class="alt-rate">' + esc(b[0]) + '</span><span class="alt-why">' + esc(o.why[0] || "") + "</span></div>"; }).join("");
@@ -392,8 +390,9 @@
     const hot = notes.filter((n) => n.hot);
     return '<div class="result">' +
       '<div class="result-for"><h2>' + esc(sel.name) + '</h2><span class="muted">' + esc(src) + "</span>" + mode + "</div>" +
+      tripQ +
       (steps.length ? '<ol class="steps">' + steps.map((h) => '<li class="step">' + h + "</li>").join("") + '<li class="step">' + cardStep + "</li></ol>" : cardStep) +
-      total +
+      total + flyNote +
       (hot.length ? '<ul class="notes">' + hot.map((n) => '<li class="n-hot">' + esc(n.t) + "</li>").join("") + "</ul>" : "") +
       netFeeHtml(sel, catId, amount) +
       usefulPromos.map(promoLine).join("") +
@@ -411,7 +410,6 @@
     const nf = S.ask.netFee;
     const entered = parseAmt(nf.mastercard) > 0 || parseAmt(nf.visa) > 0;
     const flagged = !!(sel.flags && sel.flags.netFees);
-    if (!flagged && !entered) return "";
     const g = E.networkGap({ payer: S.who, date: S.today, catId, amount, flags: sel.flags || {} }, S.status.state, S.cfg);
     let even = "";
     const extra = parseAmt(nf.mastercard) - parseAmt(nf.visa);
@@ -423,8 +421,8 @@
     } else if (g && g.gap > 0) {
       even = "The " + shortCard(g.mc) + " stays the better card unless the site charges Mastercard more than " + (amount ? E.hkd(g.gap * amount) + " extra on " + E.hkd(amount) : money(g.gap * 100) + " extra per HK$100") + ", compared with Visa.";
     } else if (g) even = "The " + shortCard(g.visa) + " (Visa) is already the better card here.";
-    return '<details class="netfee" open><summary>Card fee at checkout</summary>' +
-      '<p class="hint">This site often adds a fee that depends on the card, usually more for Mastercard. Enter the fees its payment page shows.</p>' +
+    return '<details class="netfee"' + (flagged || entered ? " open" : "") + "><summary>" + (flagged ? "Card fee at checkout" : "Different fee for Mastercard and Visa?") + "</summary>" +
+      '<p class="hint">' + (flagged ? "This site often adds a fee that depends on the card, usually more for Mastercard. Enter the fees its payment page shows." : "If the payment page shows a different fee for each card, enter them here.") + "</p>" +
       '<div class="form nf-form"><div class="two"><label for="nf-mc">Mastercard fee (HK$)<input id="nf-mc" inputmode="decimal" enterkeyhint="done" placeholder="0" value="' + esc(nf.mastercard) + '"></label>' +
       '<label for="nf-visa">Visa fee (HK$)<input id="nf-visa" inputmode="decimal" enterkeyhint="done" placeholder="0" value="' + esc(nf.visa) + '"></label></div></div>' +
       (entered && !amount ? '<p class="hint">Add the amount at the top to compare the cards with these fees.</p>' : "") +
@@ -543,7 +541,7 @@
     if (!sel) return;
     const amount = parseAmt(A.amount);
     const generic = sel.source === "quick";
-    const preset = { date: S.today, merchant: generic ? "" : sel.name, amount: amount || "", payer: S.who, card: cardId || "", category: effectiveCat(sel), flags: Object.assign({ flight: !!(sel.flags && sel.flags.flight), moneyback: !!(sel.flags && sel.flags.moneyback) }, netFeeFlags()) };
+    const preset = { date: S.today, merchant: generic ? "" : sel.name, amount: amount || "", payer: S.who, card: cardId || "", category: effectiveCat(sel), flags: Object.assign({ flight: !!askFlags(sel).flight, moneyback: !!(sel.flags && sel.flags.moneyback) }, netFeeFlags()) };
     if (!amount || !cardId || generic) { openTxnSheet(null, preset); return; }
     const doc = Object.assign({}, preset, { amount, claimed: false, claimedMiles: 0, note: "", source: "manual", ack: false, createdAt: nowIso(), createdBy: S.uid || null, updatedAt: nowIso() });
     if (await writeTxn(null, doc)) toast("Saved: " + E.hkd(amount) + " on " + cardLabel(cardId) + ".");
@@ -648,9 +646,9 @@
   function flightState(f) {
     if (f.claimed) return "Max Miles claimed" + (f.claimedMiles ? ": " + f.claimedMiles.toLocaleString("en-US") : "");
     if (f.daysLeft < 0) return "Claim window closed";
-    if (f.claimFrom) return "Max Miles can pay it back once the rent's miles land: claim between " + E.dayLabel(f.claimFrom) + " and " + E.dayLabel(f.deadline);
-    if (!f.canClaim) return "Too dear for FlyAnywhere: Max Miles cover a ticket up to " + money(S.status.miles.balance * S.cfg.miles.rate) + " now, and must pay all of it";
-    return "Max Miles can pay it back: claim in FlyAnywhere by " + E.dayLabel(f.deadline) + " (" + f.daysLeft + (f.daysLeft === 1 ? " day)" : " days)");
+    if (f.claimFrom) return "HeyMax can pay it back once the rent's miles land: claim in FlyAnywhere between " + E.dayLabel(f.claimFrom) + " and " + E.dayLabel(f.deadline);
+    if (!f.canClaim) return "Too dear for HeyMax FlyAnywhere: it pays whole tickets only, up to " + money(S.status.miles.balance * S.cfg.miles.rate) + " now";
+    return "HeyMax can pay it back: claim in FlyAnywhere by " + E.dayLabel(f.deadline) + " (" + f.daysLeft + (f.daysLeft === 1 ? " day)" : " days)");
   }
   function renderStatus() {
     if (!S.status) return;
@@ -703,11 +701,12 @@
   }
 
   /* ---------- Spending ---------- */
+  // One expense: where, what kind, the amount and card, and what it gave back in HK$ (card rewards minus fees, plus
+  // Max Miles at their FlyAnywhere value; airline miles are not counted).
   function txRow(t) {
     const a = S.status.audit[t.id];
     const flagged = !!(a && a.flagged && !t.ack);
     const cat = E.CATS[t.category];
-    const sub = [cat ? cat.label : "", nameOf(t.payer)].filter(Boolean).join(" · ");
     let flag = "";
     if (flagged) flag = '<span class="tx-flag">' + esc(a.why) + (a.loss >= 1 ? " · " + esc(E.hkd(a.loss)) + " missed" : "") + "</span>";
     else if (a && a.flagged && t.ack) flag = '<span class="tx-flag ok">Noted: ' + esc(a.why) + "</span>";
@@ -716,42 +715,59 @@
       if (f && f.canClaim && f.daysLeft >= 0) flag = '<span class="tx-flag ok">' + esc(flightState(f)) + "</span>";
     }
     const amt = Number(t.amount) || 0;
+    const back = a ? a.back : null;
+    const backHtml = back != null && Math.abs(back) >= 0.5
+      ? '<span class="tx-back ' + (back > 0 ? "pos" : "neg") + '">' + esc(back > 0 ? money(back) + " back" : money(-back) + " in fees") + "</span>" : "";
     return '<li><button type="button" class="tx' + (flagged ? " flagged" : "") + '" data-act="open-tx" data-id="' + esc(t.id) + '">' +
-      '<span><span class="tx-merchant">' + esc(t.merchant || "Purchase") + '</span><br><span class="tx-sub">' + esc(sub) + "</span></span>" +
-      '<span class="tx-right"><span class="mono">' + esc(E.hkd(amt, amt % 1 ? 2 : 0)) + '</span>' + cardPill(t.card, shortWithHolder(t.card)) + "</span>" +
+      '<span><span class="tx-merchant">' + esc(t.merchant || "Purchase") + '</span><br><span class="tx-sub">' + esc(cat ? cat.label : "") + "</span></span>" +
+      '<span class="tx-right"><span class="mono">' + esc(E.hkd(amt, amt % 1 ? 2 : 0)) + "</span>" + cardPill(t.card, shortCard(t.card)) + backHtml + "</span>" +
       flag + "</button></li>";
   }
+  // Totals for a list of expenses: spent (rent aside), back (rewards and Max Miles), fees, missed.
+  function spendTotals(list) {
+    const audit = S.status.audit;
+    const r = { spent: 0, rewards: 0, miles: 0, rentMiles: 0, fees: 0, missed: 0, back: 0 };
+    for (const t of list) {
+      const amt = Number(t.amount) || 0;
+      if (t.category !== "rent") r.spent += amt;
+      const a = audit[t.id];
+      if (!a) continue;
+      r.rewards += a.rewards || 0; r.miles += a.miles || 0; r.fees += a.fees || 0; r.back += a.back || 0;
+      if (t.category === "rent") r.rentMiles += a.miles || 0;
+      if (a.flagged) r.missed += a.loss;
+    }
+    return r;
+  }
+  // The Spending tab follows the person chosen at the top: their expenses and totals, and one line for both.
   function renderSpend() {
     if (!S.status) return;
     const m = S.month;
-    const rows = S.txns.filter((t) => E.ym(t.date || "") === m)
+    const inMonth = S.txns.filter((t) => E.ym(t.date || "") === m);
+    const rows = inMonth.filter((t) => t.payer === S.who)
       .sort((a, b) => String(b.date).localeCompare(String(a.date)) || String(b.createdAt || "").localeCompare(String(a.createdAt || "")));
-    const audit = S.status.audit;
-    let spent = 0, rewards = 0, fees = 0, missed = 0;
+    const me = spendTotals(rows), all = spendTotals(inMonth);
     const byCard = {};
-    for (const t of rows) {
-      const amt = Number(t.amount) || 0;
-      if (t.category !== "rent") spent += amt;
-      const a = audit[t.id];
-      if (a) { rewards += a.rewards || 0; fees += a.fees || 0; if (a.flagged) missed += a.loss; }
-      byCard[t.card] = (byCard[t.card] || 0) + amt;
-    }
+    for (const t of rows) byCard[t.card] = (byCard[t.card] || 0) + (Number(t.amount) || 0);
     let list = "";
     let day = "";
     for (const t of rows) {
       if (t.date !== day) { day = t.date; list += '<li><h3 class="day-h">' + esc(E.dayLabel(day)) + "</h3></li>"; }
       list += txRow(t);
     }
-    const chips = Object.keys(byCard).sort((a, b) => byCard[b] - byCard[a]).map((id) => cardPill(id, shortWithHolder(id) + " · " + E.hkd(byCard[id]))).join("");
+    const who = nameOf(S.who);
+    const chips = Object.keys(byCard).sort((a, b) => byCard[b] - byCard[a]).map((id) => cardPill(id, shortCard(id) + " · " + E.hkd(byCard[id]))).join("");
     const empty = S.dbState === "off"
       ? "Open this page in Claude, signed in, to see your shared spending."
-      : (!S.txLoaded ? "Loading…" : "Nothing logged for " + E.monthLabel(m) + ". After you pay, tap “Paid with…” on the Which card tab, or Add expense. Send Claude your card statements and it fills this in for you.");
+      : (!S.txLoaded ? "Loading…" : "Nothing logged" + (who ? " for " + who : "") + " in " + E.monthLabel(m) + ". After paying, tap “Paid with…” on the Which card tab, or Add expense. Send Claude the card statements and it fills this in.");
+    const both = all.spent !== me.spent || all.back !== me.back
+      ? '<p class="hint together">Together: ' + esc(E.hkd(all.spent)) + " spent, about " + esc(money(all.back)) + " back after fees.</p>" : "";
     $("#tab-spend").innerHTML =
-      '<div class="month-nav"><button type="button" class="icon-btn" data-act="month" data-step="-1" aria-label="Previous month">‹</button><h2>' + esc(E.monthLabel(m)) + '</h2><button type="button" class="icon-btn" data-act="month" data-step="1" aria-label="Next month">›</button></div>' +
-      '<div class="facts"><div class="fact"><div class="f-k">Spent</div><div class="f-v">' + esc(E.hkd(spent)) + '</div><div class="f-s">rent not included</div></div>' +
-      '<div class="fact"><div class="f-k">Earned, about</div><div class="f-v">' + esc(E.hkd(rewards)) + '</div><div class="f-s">rewards and savings</div></div>' +
-      '<div class="fact"><div class="f-k">Fees, about</div><div class="f-v">' + esc(E.hkd(fees)) + '</div><div class="f-s">foreign currency, overseas sites, Taobao</div></div>' +
-      '<div class="fact"><div class="f-k">Missed</div><div class="f-v">' + esc(E.hkd(missed)) + '</div><div class="f-s">by using the wrong card</div></div></div>' +
+      '<div class="month-nav"><button type="button" class="icon-btn" data-act="month" data-step="-1" aria-label="Previous month">‹</button><h2>' + esc((who ? who + " · " : "") + E.monthLabel(m)) + '</h2><button type="button" class="icon-btn" data-act="month" data-step="1" aria-label="Next month">›</button></div>' +
+      '<div class="facts"><div class="fact"><div class="f-k">Spent</div><div class="f-v">' + esc(E.hkd(me.spent)) + '</div><div class="f-s">rent not included</div></div>' +
+      '<div class="fact"><div class="f-k">Back, about</div><div class="f-v">' + esc(E.hkd(me.rewards + me.miles)) + '</div><div class="f-s">card rewards and Max Miles' + (me.rentMiles ? ", " + esc(E.hkd(me.rentMiles)) + " from the rent" : "") + "</div></div>" +
+      '<div class="fact"><div class="f-k">Fees, about</div><div class="f-v">' + esc(E.hkd(me.fees)) + '</div><div class="f-s">foreign currency, overseas sites, Taobao</div></div>' +
+      '<div class="fact"><div class="f-k">Missed</div><div class="f-v">' + esc(E.hkd(me.missed)) + '</div><div class="f-s">by using the wrong card</div></div></div>' +
+      both +
       (chips ? '<div class="by-card">' + chips + "</div>" : "") +
       (rows.length ? '<ul class="list">' + list + "</ul>" : '<p class="empty">' + esc(empty) + "</p>");
   }
@@ -1074,20 +1090,28 @@
     if (SOLO) return S.priv.miles && S.priv.miles.balance != null ? { balance: Number(S.priv.miles.balance) || 0, payments: Number(S.priv.miles.rentPayments) || 0 } : null;
     return { balance: S.status.miles.balance, payments: S.status.rently.payments };
   }
+  // Travel sites sell flights and hotels: the page asks which, since HeyMax pays much less on flights.
   const MAYBE_FLIGHT = ["Trip.com", "Expedia"];
+  const tripKind = (sel) => (sel && sel.flags && sel.flags.flight ? "flight" : (sel && MAYBE_FLIGHT.includes(sel.name) ? S.ask.trip : "other"));
+  // HeyMax FlyAnywhere pays a whole flight back with Max Miles, claimed within 31 days of booking.
+  // Returns { step } when it can pay this ticket (or any ticket up to an amount), { note } when it can't.
   function flyStep(sel, amount) {
-    const flight = sel && sel.flags && sel.flags.flight;
-    if (!flight && !(sel && MAYBE_FLIGHT.includes(sel.name))) return "";
+    const kind = tripKind(sel);
+    if (kind === "other") return null;
     const mm = maxMiles();
-    if (!mm || mm.balance < 1000) return "";
+    if (!mm || mm.balance < 1000) return null;
     const fa = E.flyAnywhere(S.today, amount, mm.balance, S.cfg, mm.payments);
-    const who = SOLO ? (nameOf("a") ? nameOf("a") + "'s" : "The") : "Your";
-    const claim = SOLO ? "then ask " + (nameOf("a") || "the account holder") + " to claim it in HeyMax FlyAnywhere" : "then claim it in HeyMax FlyAnywhere";
-    const lead = flight ? "" : "If it's a flight: ";
-    if (amount && fa.now) return "<b>" + esc(lead + "Max Miles pay this ticket back:") + "</b> " + esc(money(amount) + " back. Pay with the card below, " + claim + " by " + E.dayLabel(fa.deadline) + ".");
-    if (amount && fa.claimFrom) return "<b>" + esc(lead + "Max Miles can pay this ticket back") + "</b> " + esc("once the rent's miles land on " + E.dayLabel(fa.claimFrom) + ": " + money(amount) + " back. Pay with the card below, " + claim + " between " + E.dayLabel(fa.claimFrom) + " and " + E.dayLabel(fa.deadline) + ".");
-    if (!amount) return "<b>" + esc(lead + who + " Max Miles pay back a ticket up to " + money(fa.coverNow) + ".") + "</b> " + esc("Pay with the card below, " + claim + " within 31 days. Add the amount to check this one.");
-    return "";
+    const lead = kind === "flight" ? "" : "If it's a flight: ";
+    const owner = nameOf("a") || "the account holder";
+    const claim = SOLO ? "then ask " + owner + " to claim it in HeyMax FlyAnywhere" : "then claim it in HeyMax FlyAnywhere";
+    if (amount && fa.now) return { step: "<b>" + esc(lead + "HeyMax pays this ticket back:") + "</b> " + esc(money(amount) + " back. Pay with the card below, " + claim + " by " + E.dayLabel(fa.deadline) + ".") };
+    if (amount && fa.claimFrom) return { step: "<b>" + esc(lead + "HeyMax can pay this ticket back") + "</b> " + esc("once the rent's miles land on " + E.dayLabel(fa.claimFrom) + ": " + money(amount) + " back. Pay with the card below, " + claim + " between " + E.dayLabel(fa.claimFrom) + " and " + E.dayLabel(fa.deadline) + ".") };
+    if (amount) {
+      const credits = E.rentCredits(S.today, E.addDays(fa.deadline, -2), S.cfg, mm.payments);
+      return { note: lead + "HeyMax can't pay this ticket back: FlyAnywhere pays whole tickets only, up to " + money(fa.coverNow) + " now" +
+        (credits.length && fa.coverBy > fa.coverNow ? " (" + money(fa.coverBy) + " once the rent's miles land on " + E.dayLabel(credits[0].date) + ")" : "") + "." };
+    }
+    return { step: "<b>" + esc(lead + "HeyMax pays back a ticket up to " + money(fa.coverNow) + ".") + "</b> " + esc("Pay with the card below, " + claim + " within 31 days. Add the amount to check this one.") };
   }
   // On HeyMax's shopping list: HK$ back on top of the card, if the purchase starts from HeyMax (its app, or the link).
   function heymaxStep(sel, amount) {
@@ -1096,13 +1120,21 @@
     const link = /^https:\/\//.test(S.priv.links[h.k] || "") ? S.priv.links[h.k] : "";
     if (SOLO && !link) return null;
     const rate = S.cfg.miles.rate || 0.12;
-    const value = h.fixed ? h.fixed * rate : (amount ? amount / h.per * rate : 0);
-    const what = h.fixed ? money(h.fixed * rate) + " back" : (amount ? "about " + money(value) + " back" : money(100 / h.per * rate) + " back per HK$100");
+    const kind = tripKind(sel);
+    const on = (per) => (amount ? money(amount / per * rate) : money(100 / per * rate) + " per HK$100");
+    let what, value = 0;
+    if (h.fixed) { what = money(h.fixed * rate) + " back"; value = h.fixed * rate; }
+    else if ("flightPer" in h && kind === "flight") {
+      what = h.flightPer ? "about " + on(h.flightPer) + " back on this flight (flights earn much less than hotels)" : "flights earn much less than hotels here: HeyMax shows the rate when you open it";
+      value = amount && h.flightPer ? amount / h.flightPer * rate : 0;
+    } else if ("flightPer" in h && kind === "") {
+      what = "about " + on(h.per) + " back on a hotel or tour, " + (h.flightPer ? "about " + on(h.flightPer) : "much less") + " on a flight";
+    } else { what = (amount ? "about " : "") + on(h.per) + " back"; value = amount ? amount / h.per * rate : 0; }
     const owner = nameOf("a");
     const how = SOLO
       ? "Use the button, then pay in the page it opens (not in the " + sel.name + " app)." + (owner ? " It goes to " + owner + "'s HeyMax." : "")
       : "Start from the HeyMax app before paying, or nothing is tracked.";
-    const html = "<b>" + esc("Open " + sel.name + " through HeyMax:") + "</b> " + esc(what + ", on top of the card. " + how + (h.note ? " " + h.note : "")) +
+    const html = "<b>" + esc("Open " + sel.name + " through HeyMax:") + "</b> " + esc(what + ", on top of the card." + ("flightPer" in h && kind === "" ? " Say which it is above." : "") + " " + how + (h.note ? " " + h.note : "")) +
       (link ? '<div><a class="btn small" href="' + esc(link) + '" target="_blank" rel="noopener noreferrer">Open ' + esc(sel.name) + " via HeyMax</a></div>" : "");
     return { html, value };
   }
@@ -1151,6 +1183,7 @@
       if (q) { S.ask.sel = { name: q.label, cat: q.cat, flags: q.flags || {}, source: "quick" }; renderAskBody(); window.scrollTo(0, 0); }
       return;
     }
+    if (b.dataset.trip) { S.ask.trip = S.ask.trip === b.dataset.trip ? "" : b.dataset.trip; renderAskBody(); return; }
     if (b.dataset.match != null) { const m = S.ask.matches.find((x) => x.name === b.dataset.match); if (m) { S.ask.sel = fromMatch(m); S.ask.netFee = { mastercard: "", visa: "" }; renderAskBody(); } return; }
     if (b.dataset.cat) {
       const name = S.ask.text.trim();
