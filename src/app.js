@@ -365,7 +365,13 @@
       cardFace(p.id, S.who, big, small) +
       (scan.length ? '<p class="hint">Scan ' + esc(scan.join(" and ")) + " at the till too.</p>" : "") +
       (backup && p.id !== "cash" ? '<p class="backup">Not accepted? ' + cardPill(backup.id, shortCard(backup.id)) + " " + esc(bk[0] === "Cash" ? "cash" : bk[0] + " " + bk[1].split(":")[0]) + "</p>" : "");
-    const total = amount && hm && hm.value > 0 && p.net > 0 ? '<p class="total">In all: about <b>' + esc(money(hm.value + p.net * amount)) + "</b> back.</p>" : "";
+    // In all: the card, HeyMax and what the booking itself earns (Trip Coins), once the amount is known.
+    const earned = E.earnAt(sel.name, amount, tripKind(sel));
+    const earnedValue = earned.reduce((s, x) => s + x.value, 0);
+    const hmValue = hm && hm.value > 0 ? hm.value : 0;
+    const total = amount && p.net > 0 && (hmValue || earnedValue)
+      ? '<p class="total">In all: about <b>' + esc(money(hmValue + earnedValue + p.net * amount)) + "</b> back" +
+        esc(earned.map((x) => ", with " + money(x.value) + " in " + E.PROGRAMS[x.program].useName).join("")) + ".</p>" : "";
     const flyNote = fly && fly.note ? '<p class="hint">' + esc(fly.note) + "</p>" : "";
     const tripQ = MAYBE_FLIGHT.includes(sel.name) && !(sel.flags && sel.flags.flight)
       ? '<div class="trip-kind" role="group" aria-label="What are you buying?"><span>This is</span>' +
@@ -702,7 +708,7 @@
 
   /* ---------- Spending ---------- */
   // One expense: where, what kind, the amount and card, and what it gave back in HK$ (card rewards minus fees, plus
-  // Max Miles at their FlyAnywhere value; airline miles are not counted).
+  // Max Miles at their FlyAnywhere value and shop points such as Trip Coins; airline miles are not counted).
   function txRow(t) {
     const a = S.status.audit[t.id];
     const flagged = !!(a && a.flagged && !t.ack);
@@ -723,21 +729,27 @@
       '<span class="tx-right"><span class="mono">' + esc(E.hkd(amt, amt % 1 ? 2 : 0)) + "</span>" + cardPill(t.card, shortCard(t.card)) + backHtml + "</span>" +
       flag + "</button></li>";
   }
-  // Totals for a list of expenses: spent (rent aside), back (rewards and Max Miles), fees, missed.
+  // Totals for a list of expenses: spent (rent aside), back (rewards, Max Miles, shop points such as Trip Coins), fees, missed.
   function spendTotals(list) {
     const audit = S.status.audit;
-    const r = { spent: 0, rewards: 0, miles: 0, rentMiles: 0, fees: 0, missed: 0, back: 0 };
+    const r = { spent: 0, rewards: 0, miles: 0, rentMiles: 0, points: 0, pointsBy: {}, fees: 0, missed: 0, back: 0 };
     for (const t of list) {
       const amt = Number(t.amount) || 0;
       if (t.category !== "rent") r.spent += amt;
       const a = audit[t.id];
       if (!a) continue;
-      r.rewards += a.rewards || 0; r.miles += a.miles || 0; r.fees += a.fees || 0; r.back += a.back || 0;
+      r.rewards += a.rewards || 0; r.miles += a.miles || 0; r.points += a.points || 0; r.fees += a.fees || 0; r.back += a.back || 0;
+      for (const k of Object.keys(a.pointsBy || {})) r.pointsBy[k] = (r.pointsBy[k] || 0) + a.pointsBy[k];
       if (t.category === "rent") r.rentMiles += a.miles || 0;
       if (a.flagged) r.missed += a.loss;
     }
     return r;
   }
+  const joinAnd = (parts) => (parts.length > 1 ? parts.slice(0, -1).join(", ") + " and " + parts[parts.length - 1] : parts[0] || "");
+  // What comes back besides the card: ["Max Miles", "Trip Coins"].
+  const extraNames = (r) => (r.miles ? ["Max Miles"] : []).concat(Object.keys(r.pointsBy || {}).map((k) => E.PROGRAMS[k].useName || E.PROGRAMS[k].name));
+  // "card rewards, Max Miles and Trip Coins": what the Back figure is made of.
+  const backParts = (r) => joinAnd(["card rewards"].concat(extraNames(r)));
   // The Spending tab follows the person chosen at the top: their expenses and totals, and one line for both.
   function renderSpend() {
     if (!S.status) return;
@@ -764,7 +776,7 @@
     $("#tab-spend").innerHTML =
       '<div class="month-nav"><button type="button" class="icon-btn" data-act="month" data-step="-1" aria-label="Previous month">‹</button><h2>' + esc((who ? who + " · " : "") + E.monthLabel(m)) + '</h2><button type="button" class="icon-btn" data-act="month" data-step="1" aria-label="Next month">›</button></div>' +
       '<div class="facts"><div class="fact"><div class="f-k">Spent</div><div class="f-v">' + esc(E.hkd(me.spent)) + '</div><div class="f-s">rent not included</div></div>' +
-      '<div class="fact"><div class="f-k">Back, about</div><div class="f-v">' + esc(E.hkd(me.rewards + me.miles)) + '</div><div class="f-s">card rewards and Max Miles' + (me.rentMiles ? ", " + esc(E.hkd(me.rentMiles)) + " from the rent" : "") + "</div></div>" +
+      '<div class="fact"><div class="f-k">Back, about</div><div class="f-v">' + esc(E.hkd(me.rewards + me.miles + me.points)) + '</div><div class="f-s">' + esc(backParts(me)) + (me.rentMiles ? ", " + esc(E.hkd(me.rentMiles)) + " from the rent" : "") + "</div></div>" +
       '<div class="fact"><div class="f-k">Fees, about</div><div class="f-v">' + esc(E.hkd(me.fees)) + '</div><div class="f-s">foreign currency, overseas sites, Taobao</div></div>' +
       '<div class="fact"><div class="f-k">Missed</div><div class="f-v">' + esc(E.hkd(me.missed)) + '</div><div class="f-s">by using the wrong card</div></div></div>' +
       both +
@@ -807,10 +819,14 @@
     const a = t ? S.status.audit[t.id] : null;
     const catOpts = Object.keys(E.CATS).map((k) => '<option value="' + k + '"' + (k === d.category ? " selected" : "") + ">" + esc(E.CATS[k].label) + "</option>").join("");
     const ro = !canWrite();
+    // Besides the card: Max Miles and shop points such as Trip Coins, in HK$.
+    const extraV = a ? (a.miles || 0) + (a.points || 0) : 0;
+    const extra = extraV >= 0.5 ? E.hkd(extraV, extraV < 20 ? 1 : 0) + " in " + joinAnd(extraNames(a)) : "";
     const html =
-      (a && a.flagged ? '<p class="callout ' + (t.ack ? "warn" : "bad") + '">' + esc(a.why) + (a.loss >= 1 ? " (" + esc(E.hkd(a.loss)) + " missed)." : ".") + "</p>" : "") +
-      (a && !a.flagged && a.earned > 0 ? '<p class="callout good">Good card: about ' + esc(E.hkd(a.earned, a.earned < 20 ? 1 : 0)) + " back (" + esc(E.pct(a.net)) + ").</p>" : "") +
-      (a && !a.flagged && a.earned < 0 ? '<p class="callout warn">Fees outweigh the rewards here: about ' + esc(E.hkd(-a.earned, 1)) + " net cost (" + esc(E.pct(a.net)) + ").</p>" : "") +
+      (a && a.flagged ? '<p class="callout ' + (t.ack ? "warn" : "bad") + '">' + esc(a.why) + (a.loss >= 1 ? " (" + esc(E.hkd(a.loss)) + " missed)." : ".") + (extra ? " Back besides the card: " + esc(extra) + "." : "") + "</p>" : "") +
+      (a && !a.flagged && a.earned > 0 ? '<p class="callout good">Good card: about ' + esc(E.hkd(a.earned, a.earned < 20 ? 1 : 0)) + " back (" + esc(E.pct(a.net)) + ")" + (extra ? ", plus " + esc(extra) : "") + ".</p>" : "") +
+      (a && !a.flagged && a.earned < 0 ? '<p class="callout warn">Fees outweigh the rewards here: about ' + esc(E.hkd(-a.earned, 1)) + " net cost (" + esc(E.pct(a.net)) + ")." + (extra ? " Back besides the card: " + esc(extra) + "." : "") + "</p>" : "") +
+      (a && !a.flagged && !a.earned && extra ? '<p class="callout good">About ' + esc(extra) + " back.</p>" : "") +
       '<form id="txForm" class="form" novalidate>' +
       '<div class="two"><label for="f-date">Date<input type="date" id="f-date" value="' + esc(d.date) + '" required></label>' +
       '<label for="f-amount">Amount (HK$)<input id="f-amount" enterkeyhint="done" inputmode="decimal" value="' + esc(d.amount) + '" placeholder="0" required></label></div>' +
@@ -849,7 +865,10 @@
     const date = v("f-date").value, card = v("f-card").value, category = v("f-category").value;
     const err = v("f-error");
     if (!date || !amount || !card || !category) { err.hidden = false; err.textContent = "Fill in the date, the amount and the card."; return; }
-    const doc = {
+    // Fields the form doesn't show (what the purchase earned, the rent's miles, import details) are kept.
+    const kept = {};
+    if (t) for (const k of Object.keys(t)) if (k !== "id") kept[k] = t[k];
+    const doc = Object.assign(kept, {
       date, merchant: v("f-merchant").value.trim(), amount, payer: v("f-payer").value, card, category,
       // Card fees entered at checkout are kept; the two ticks come from the form.
       flags: Object.assign(baseFlags && baseFlags.netFee ? { netFee: baseFlags.netFee } : {}, { flight: v("f-flight").checked, moneyback: v("f-moneyback").checked }),
@@ -861,8 +880,7 @@
       createdAt: t ? t.createdAt || nowIso() : nowIso(),
       createdBy: t ? t.createdBy || null : S.uid || null,
       updatedAt: nowIso(),
-    };
-    if (t && t.miles) doc.miles = t.miles;
+    });
     const tip = t ? "" : tipFor(doc);
     if (await writeTxn(t ? t.id : null, doc)) { closeSheet(); toast((t ? "Saved." : "Saved: " + E.hkd(amount) + ".") + tip); }
   }
@@ -1078,7 +1096,8 @@
       const soon = r.next && r.next.daysLeft <= 60 ? " " + E.runLabel(r, r.next) + E.runVerb(r, r.next) + E.dayLabel(r.next.on) + "." : "";
       const head = "Use " + whose + (prog.useName || prog.name) + ":";
       if (prog.kind === "shop") {
-        const avail = r.unit === "HK$" ? r.value : Math.floor(r.value);
+        // Points spent in whole dollars (MoneyBack, yuu) round down; Trip Coins pay to the cent.
+        const avail = r.unit === "HK$" || prog.hkdEach ? r.value : Math.floor(r.value);
         const off = amount ? Math.min(avail, amount) : avail;
         return "<b>" + esc(head) + "</b> " + esc((amount && avail > amount ? "" : "up to ") + money(off) + " off. " + use + soon);
       }
@@ -1147,9 +1166,8 @@
       const when = x ? E.runLabel(r, x) + E.runVerb(r, x) + E.dayLabel(x.on) + (x.on.slice(0, 4) !== S.today.slice(0, 4) ? " " + x.on.slice(0, 4) : "") : "";
       const hot = x && x.daysLeft <= 30 && !(x.value != null && x.value < 5);
       const state = r.usable === true ? "ok" : (r.usable === false ? "no" : "unk");
-      const unitWord = r.kind === "miles" ? "miles" : "points";
       const use = r.usable === true ? "Usable. " + r.use
-        : (r.usable === false ? "Needs " + fmtCount(r.short) + " more " + unitWord + ". " + r.use : "Value not published. " + r.use);
+        : (r.usable === false ? "Needs " + fmtCount(r.short) + " more " + r.word + ". " + r.use : "Value not published. " + r.use);
       const bal = r.unit === "HK$" ? E.hkd(r.balance, 2) : (r.unit === "RC" ? "$" + fmtCount(r.balance) + " RC" : fmtCount(r.balance));
       return '<div class="pt ' + state + '"><span class="pt-name">' + esc(r.name) + (nameOf(r.owner) ? ' <span class="muted">· ' + esc(nameOf(r.owner)) + "</span>" : "") + "</span>" +
         '<span class="pt-right"><span class="mono pt-bal">' + esc(bal) + "</span>" + (r.value != null && r.unit !== "HK$" ? '<span class="pt-val">≈ ' + esc(money(r.value)) + "</span>" : "") + "</span>" +

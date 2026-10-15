@@ -294,8 +294,25 @@
       use: "Cash & Miles at checkout on Lufthansa, SWISS or Austrian: from 3,000 miles, about HK$0.04 a mile.", at: ["Lufthansa", "SWISS"] },
     delta: { name: "Delta SkyMiles", useName: "Delta miles", kind: "miles", hkdEach: 0.078, min: 5000,
       use: "Pay with Miles from 5,000 miles (US$50), for Delta card holders.", at: ["Delta"] },
+    // Trip.com's own rewards, on the account that books (not transferable): 100 Trip Coins = US$1 off any Trip.com
+    // booking, no minimum, valid 18 months. Flights credit them once the ticket is issued, hotels after the stay.
+    // `earn` = share of the price paid, whatever the card: the Gold tier in Oct 2026 (0.2% on flights plus the tier
+    // bonus, about 0.24% in practice; 0.5% on hotels).
+    tripcoins: { name: "Trip.com Trip Coins", useName: "Trip Coins", word: "Trip Coins", kind: "shop", hkdEach: 0.0785, min: 1,
+      earn: { flight: 0.0024, other: 0.005 }, use: "Turn on Trip Coins at payment (100 coins = US$1).", at: ["Trip.com"] },
   };
   const programsAt = (merchantName) => Object.keys(PROGRAMS).filter((id) => (PROGRAMS[id].at || []).includes(merchantName));
+  // What a purchase earns at this place whatever the card (Trip Coins on Trip.com), in HK$. `kind` is "flight" or
+  // "other" where the rate depends on it; nothing while it isn't known.
+  function earnAt(merchantName, amount, kind) {
+    const out = [];
+    for (const id of programsAt(merchantName)) {
+      const e = PROGRAMS[id].earn;
+      const rate = e && (kind === "flight" ? e.flight : kind === "other" ? e.other : null);
+      if (rate && amount > 0) out.push({ program: id, value: amount * rate });
+    }
+    return out;
+  }
 
   // HeyMax shopping portal, Hong Kong (rates as listed in the app on 14 Oct 2026): `per` = HK$ spent for 1 Max Mile;
   // `fixed` = flat Max Miles. Start from the HeyMax app (or its link) before paying, or nothing is tracked.
@@ -370,6 +387,7 @@
       const usable = min == null ? null : balance >= min && balance > 0;
       rows.push({
         id: p.id || p.program + "_" + (p.owner || ""), program: p.program, name: prog.name, kind: prog.kind, owner: p.owner || "",
+        word: prog.word || (prog.kind === "miles" ? "miles" : "points"),
         users: Array.isArray(p.users) && p.users.length ? p.users : [p.owner || "a"],
         unit: prog.unit || (prog.kind === "miles" ? "miles" : "points"), balance, value, runs, next: runs[0] || null,
         min, usable, short: usable === false ? Math.max(0, Math.ceil(min - balance)) : 0, use: p.use || prog.use || "",
@@ -420,7 +438,7 @@
     if (x.voucher) return x.voucher + (x.value ? " (" + hkd(x.value) + ")" : "");
     if (row.unit === "HK$") return (x.all ? "the balance, " : "") + hkd(x.amount, 2) + (x.all ? "" : " of the balance");
     if (row.unit === "RC") return "$" + countLabel(x.amount) + " RewardCash";
-    return countLabel(x.amount) + " " + (row.kind === "miles" ? "miles" : "points");
+    return countLabel(x.amount) + " " + (row.word || (row.kind === "miles" ? "miles" : "points"));
   }
   const runVerb = (row, x) => (x.voucher ? " ends " : (row.unit === "HK$" || row.unit === "RC" || x.amount === 1 ? " expires " : " expire "));
   // What runs out within `horizon` days. Under HK$5 is only information.
@@ -971,16 +989,37 @@
     for (const t of sortTxns(txns || [])) {
       const cat = CATS[t.category];
       const def = CARDS[t.card];
-      // Max Miles that come with the purchase, at their FlyAnywhere value: tracked through HeyMax (heymaxMiles),
-      // or the rent's miles from Rently. Asia Miles and other airline miles are not counted.
-      let miles = Number(t.heymaxMiles) || 0;
+      // What the purchase earned besides the card, in HK$. `earn` holds it per programme ({ heymax: 150,
+      // tripcoins: 200 }): Max Miles tracked through HeyMax (formerly `heymaxMiles`), valued for FlyAnywhere, plus the
+      // rent's miles from Rently; shop points such as Trip Coins at their value. Airline miles are not counted.
+      const earn = t.earn || {};
+      let miles = Number(earn.heymax != null ? earn.heymax : t.heymaxMiles) || 0;
       if (t.category === "rent" && t.card === "fps") {
         miles += Number(t.miles) || (rentN < cfg.rently.promoPayments ? cfg.rently.promoMiles : cfg.rently.standardMiles);
         rentN++;
       }
       const milesBack = miles * mileRate;
+      const pointsBy = {};
+      let points = 0;
+      for (const k of Object.keys(earn)) {
+        const prog = PROGRAMS[k];
+        if (!prog || prog.kind !== "shop") continue;
+        const v = pointsValue(prog, Number(earn[k]) || 0) || 0;
+        if (v) { pointsBy[k] = v; points += v; }
+      }
+      // Programmes that pay on every booking at the place (Trip Coins on Trip.com): estimated until `earn` has the
+      // figure the programme credited.
+      const place = String(t.merchant || "").toLowerCase();
+      const isAt = (x) => place === x.toLowerCase() || place.startsWith(x.toLowerCase() + " ");
+      for (const k of Object.keys(PROGRAMS)) {
+        const e = PROGRAMS[k].earn;
+        if (!e || earn[k] != null || !(PROGRAMS[k].at || []).some(isAt)) continue;
+        const v = (Number(t.amount) || 0) * (t.flags && t.flags.flight ? e.flight : e.other);
+        if (v > 0) { pointsBy[k] = v; points += v; }
+      }
+      const extra = milesBack + points;
       if (!(cat && def && t.payer && ["easy", "red", "citi", "hs"].includes(def.kind))) {
-        byId[t.id] = { earned: 0, rewards: 0, fees: 0, miles: milesBack, back: milesBack, net: 0, best: t.card, bestNet: 0, loss: 0, flagged: false, why: "", mode: "best" };
+        byId[t.id] = { earned: 0, rewards: 0, fees: 0, miles: milesBack, points, pointsBy, back: extra, net: 0, best: t.card, bestNet: 0, loss: 0, flagged: false, why: "", mode: "best" };
       }
       if (cat && def && t.payer && ["easy", "red", "citi", "hs"].includes(def.kind)) {
         const rec = recommend({ payer: t.payer, date: t.date, catId: t.category, amount: t.amount, flags: t.flags || {} }, st, cfg);
@@ -1003,7 +1042,7 @@
           }
         }
         // earned = net of fees; rewards and fees separately, for the Spending totals; back = what comes back in HK$.
-        byId[t.id] = { earned: actual.net * amount, rewards: actual.rebate * amount, fees: actual.fee * amount, miles: milesBack, back: actual.net * amount + milesBack,
+        byId[t.id] = { earned: actual.net * amount, rewards: actual.rebate * amount, fees: actual.fee * amount, miles: milesBack, points, pointsBy, back: actual.net * amount + extra,
           net: actual.net, best, bestNet: rec ? rec.pick.net : actual.net, loss, flagged, why, mode: rec ? rec.mode : "best" };
       }
       applyTxn(st, t, cfg, windows);
@@ -1151,7 +1190,7 @@
   }
 
   const api = {
-    PEOPLE, setPeople, cardName, PROGRAMS, programsAt, HEYMAX, heymaxFor, pointsSummary, pointsAlerts, runLabel, runVerb, pointsToUse,
+    PEOPLE, setPeople, cardName, PROGRAMS, programsAt, earnAt, HEYMAX, heymaxFor, pointsSummary, pointsAlerts, runLabel, runVerb, pointsToUse,
     flyAnywhere, rentCredits, TRAVEL_GURU,
     CARDS, CARD_ORDER, CATS, COUNTRIES, MERCHANTS, PROMOS, DEFAULT_CONFIG,
     mergeConfig, deepMerge, matchMerchants, promosFor, rateFor, recommend, networkGap, defaultCard, audit, status, newState,

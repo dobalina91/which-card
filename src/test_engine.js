@@ -287,10 +287,25 @@ const backTx = [
   T({ id: "b4", date: "2026-10-13", card: "easy_b", category: "abroad_eea", amount: 1000, merchant: "Shop in Nice", payer: "b" }),
 ];
 const ba = E.audit(backTx, base).byId;
-check("Back: Red 4% on HK$6,800 plus 180 Max Miles = HK$272 + HK$21.60", ba.b1.back.toFixed(2), "293.60");
+check("Back: Red 4% on HK$6,800, 180 Max Miles, Trip Coins at 0.24% = HK$272 + 21.60 + 16.32", ba.b1.back.toFixed(2), "309.92");
 check("...the rent's 8,400 Max Miles = HK$1,008", ba.b2.back.toFixed(0), "1008");
 check("...easy at PARKnSHOP: Home 5X and MoneyBack, 4% = HK$20", ba.b3.back.toFixed(2), "20.00");
 check("...in shops abroad: fees bigger than rewards", ba.b4.back.toFixed(2), "-15.50");
+
+// Trip Coins: Trip.com's own rewards, on the account that books, whatever the card. (Test figures.)
+const tc = E.pointsSummary([{ id: "tc_a", program: "tripcoins", owner: "a", balance: 500, expiring: [{ amount: 500, on: "2028-03-31" }] }], "2026-10-15");
+check("Trip Coins 500: usable, about HK$39", tc[0].usable + " " + tc[0].value.toFixed(2), "true 39.25");
+check("...'500 Trip Coins expire'", E.runLabel(tc[0], tc[0].next) + E.runVerb(tc[0], tc[0].next), "500 Trip Coins expire ");
+check("...suggested on Trip.com, to A only", E.pointsToUse("Trip.com", tc, "a").length + " " + E.pointsToUse("Trip.com", tc, "b").length, "1 0");
+check("Trip.com earns Trip Coins: 0.24% on a HK$10,000 flight, 0.5% on a hotel, nothing while unknown",
+  E.earnAt("Trip.com", 10000, "flight").map((x) => x.program + " " + x.value.toFixed(0)).join() + " / " + E.earnAt("Trip.com", 10000, "other")[0].value.toFixed(0) + " / " + E.earnAt("Trip.com", 10000, "").length, "tripcoins 24 / 50 / 0");
+check("...nothing elsewhere", E.earnAt("Agoda", 10000, "other").length, 0);
+const tcBack = E.audit([T({ id: "c1", date: "2026-10-14", card: "red_a", category: "online_hk", amount: 5000, merchant: "Trip.com", flags: { flight: 1 }, earn: { heymax: 100, tripcoins: 200 } })], base).byId.c1;
+check("Back with earn: Red 4% on HK$5,000 + 100 Max Miles + 200 Trip Coins = 200 + 12 + 15.70", tcBack.back.toFixed(2) + " " + tcBack.points.toFixed(2), "227.70 15.70");
+check("...Trip Coins estimated until the credited figure is in: 0.24% of a HK$5,000 flight = HK$12",
+  E.audit([T({ id: "c3", date: "2026-10-14", card: "red_a", category: "online_hk", amount: 5000, merchant: "Trip.com · ticket", flags: { flight: 1 } })], base).byId.c3.points.toFixed(2), "12.00");
+check("...a hotel: 0.5%; not on another site", E.audit([T({ id: "c4", date: "2026-10-14", card: "red_a", category: "online_hk", amount: 2000, merchant: "Trip.com" }), T({ id: "c5", date: "2026-10-14", card: "red_a", category: "online_hk", amount: 2000, merchant: "Trip.company.example" })], base).byId.c4.points.toFixed(2) + " " + E.audit([T({ id: "c5", date: "2026-10-14", card: "red_a", category: "online_hk", amount: 2000, merchant: "Trip.company.example" })], base).byId.c5.points, "10.00 0");
+check("...airline miles in earn are not counted", E.audit([T({ id: "c2", date: "2026-10-14", card: "red_a", category: "online_hk", amount: 1000, earn: { asiamiles: 1000 } })], base).byId.c2.back.toFixed(2), "40.00");
 
 // HSBC Travel Guru (GO, 3%): HSBC cards beat cash in shops abroad, as a target to reach.
 const tgCfg = E.deepMerge(base, { travelGuru: { a: "go" } });
