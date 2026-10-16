@@ -81,8 +81,10 @@ purchase earned besides the card in the expense's `earn`, per programme: `{ "hey
 Trip Coins on Trip.com, yuu at its partners), the page estimates it until the credited figure is put in. Airline
 miles are not counted.
 
-Expenses come from the bank's emails (HSBC transaction notifications, statements) that the owner's Gmail filter puts
-in the "Banking" label: import them when the owner asks, not on a schedule. Skip card-verification charges (HK$1 when
+Expenses come from the monthly HSBC eStatements (PDF) or the transaction CSV from HSBC Online Banking, imported when
+the owner asks, not on a schedule, by the import script kept in the app's database (`tools/wc_import`; the owner's
+import skill runs it). HSBC's e-mails in the owner's "Banking" Gmail label cover card-not-present payments only
+(online, in apps), so they are a stopgap until the statement. Skip card-verification charges (HK$1 when
 a card is linked to an app such as HeyMax) and their refunds; a return cancels its purchase; `DCC FEE` lines are left
 to the engine (the category carries the 1%). `AlipayHK*NUCC` is AlipayHK paying in mainland China, charged in HK$
 (`wallet_buy`); `ALP*` or `Alipay*` lines from China are the card used in mainland Alipay, in yuan (`abroad_asia7`).
