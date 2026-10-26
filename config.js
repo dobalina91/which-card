@@ -1,7 +1,7 @@
 window.WC_EMBED = {
  "mode": "solo",
  "payer": "b",
- "builtOn": "2026-10-26",
+ "builtOn": "2026-10-27",
  "cfg": {
   "cards": {
    "red_b": {
@@ -14,7 +14,7 @@ window.WC_EMBED = {
    "citi": {
     "status": "active",
     "approvedOn": "2026-10-26",
-    "suppCard": false
+    "suppCard": true
    },
    "hs_b": {
     "status": "planned",
