@@ -1,10 +1,11 @@
 {
   "payer": "b",
-  "builtOn": "2026-10-15",
+  "builtOn": "2026-10-26",
   "cfg": {
     "cards": {
       "red_b": { "status": "active", "since": "2026-10-12" },
-      "citi": { "status": "pending", "approvedOn": "", "suppCard": false },
+      "easy_b": { "status": "active" },
+      "citi": { "status": "active", "approvedOn": "2026-10-26", "suppCard": false },
       "hs_b": { "status": "planned", "issuedOn": "", "funRegistered": false }
     },
     "redHot": { "b": { "cat": "home", "since": "2026-10-12" } },
