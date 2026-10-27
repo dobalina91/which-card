@@ -77,7 +77,7 @@ fs.writeFileSync(path.join(out, "config.js"), configJs);
 for (const icon of ["icon-180.png", "icon-192.png", "icon-512.png"]) fs.copyFileSync(here("assets/" + icon), path.join(out, icon));
 
 // Card pictures: published next to both pages under cards/ (the artifact gets them through the publish `files`).
-const CARD_FILES = ["red.webp", "red-thumb.webp", "easy.webp", "easy-thumb.webp"];
+const CARD_FILES = ["red.webp", "red-thumb.webp", "easy.webp", "easy-thumb.webp", "citi.webp", "citi-thumb.webp"];
 for (const dir of [here("dist/cards"), path.join(out, "cards")]) {
   fs.mkdirSync(dir, { recursive: true });
   for (const f of CARD_FILES) fs.copyFileSync(here("assets/cards/" + f), path.join(dir, f));

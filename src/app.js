@@ -34,6 +34,7 @@
   const CARD_IMG = {
     red: { src: "cards/red.webp", thumb: "cards/red-thumb.webp", shape: "landscape", w: 480, h: 302 },
     easy: { src: "cards/easy.webp", thumb: "cards/easy-thumb.webp", shape: "portrait", w: 302, h: 480 },
+    citi: { src: "cards/citi.webp", thumb: "cards/citi-thumb.webp", shape: "landscape", w: 480, h: 307 },
   };
   const cardImg = (id) => CARD_IMG[(E.CARDS[id] || {}).kind] || null;
   const cardPill = (id, text) => {

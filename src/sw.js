@@ -3,7 +3,7 @@
 const CACHE = "which-card-__VERSION__";
 const HOME = new URL("./", self.location).href;
 const CORE = ["./", "app.css", "config.js", "engine.js", "app.js", "manifest.webmanifest", "icon-180.png", "icon-192.png",
-  "cards/red.webp", "cards/red-thumb.webp", "cards/easy.webp", "cards/easy-thumb.webp"];
+  "cards/red.webp", "cards/red-thumb.webp", "cards/easy.webp", "cards/easy-thumb.webp", "cards/citi.webp", "cards/citi-thumb.webp"];
 
 self.addEventListener("install", (event) => {
   event.waitUntil(caches.open(CACHE).then((c) => c.addAll(CORE)).then(() => self.skipWaiting()));

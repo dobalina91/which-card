@@ -31,7 +31,7 @@ those extras.
 | `snapshot.js` | `node snapshot.js <store export> > <scratch>/private.json` builds the partner page's extras from an export of the store (`config/main`, `txns`, `points`, made with ArtifactData `list` and `out_dir`). Keep both outside the repository. |
 | `seal.js`, `sealed.json` | `node seal.js <scratch>/private.json` writes `sealed.json`, only when the code or the extras changed. Delete `private.json` afterwards. |
 | `sw.js` | The partner page's offline service worker (its cache name changes with every build). |
-| `assets/` | Icons and the card pictures (HSBC Red and easy) published next to both pages. |
+| `assets/` | Icons and the card pictures (HSBC Red and easy, Citi Cash Back) published next to both pages. |
 
 ## Build, test, publish
 
