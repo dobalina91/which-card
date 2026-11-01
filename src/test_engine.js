@@ -346,6 +346,18 @@ check("match 'sushi'", top("sushi"), "Sushiro");
 check("match 'PARKnSHOP Tsuen Wan'", top("PARKnSHOP Tsuen Wan"), "PARKnSHOP");
 check("match 'hktvmall'", top("hktvmall"), "HKTVmall");
 check("match '百佳超級市場'", top("百佳超級市場"), "PARKnSHOP");
+// Store brands of a chain (`g`) are advised exactly like the chain: category, flags, points, offers.
+const brands = E.MERCHANTS.filter((m) => m.g);
+check("PARKnSHOP brands: TASTE, FUSION, food le parc, GREAT FOOD HALL, GOURMET, International", brands.filter((m) => m.g === "PARKnSHOP").length, 6);
+check("Wellcome brands: Market Place (Jasons), Oliver's", brands.filter((m) => m.g === "Wellcome").length, 2);
+const advice = (n) => { const m = E.MERCHANTS.find((x) => x.n === n); return [m.c, JSON.stringify(m.f || {}), E.programsAt(n).join(), E.promosFor(n, "easy_a").map((p) => p.text).join("|")].join(" / "); };
+for (const m of brands) check(m.n + " advised like " + m.g, advice(m.n), advice(m.g));
+check("match 'Fusion'", top("Fusion"), "FUSION");
+check("match 'International'", top("International"), "International by PARKnSHOP");
+check("match 'Jasons Food & Living'", top("Jasons Food & Living"), "Market Place");
+const fu = E.matchMerchants("Fusion", [])[0];
+r = rec(base, { catId: fu.cat, amount: 600, flags: fu.flags });
+check("FUSION A -> easy, like PARKnSHOP", r.pick.id, "easy_a");
 check("match 'city super'", top("city super"), "city'super");
 check("match 'Booking.com'", top("Booking.com"), "Booking.com");
 check("match 'taxi' not tax", top("taxi"), "Taxi");

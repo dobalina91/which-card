@@ -108,6 +108,9 @@ confirm the change; otherwise report it as "to watch". Add or adjust a test for 
 2. **HSBC Red Hot Rewards of Your Choice** (hsbc.com.hk/credit-cards/rewards/your-choice/): 5X (2% extra) up to
    HK$100,000 a year; the Home list of merchants (in `MERCHANTS`).
 3. **HSBC easy / MoneyBack**: MoneyBack points at PARKnSHOP, Fortress, Watsons; member-day offers (`PROMOS`).
+   PARKnSHOP's store brands (TASTE, FUSION, International, GOURMET, GREAT FOOD HALL, food le parc) and Wellcome's
+   (Market Place/Jasons, Oliver's) carry `g` (their chain) in `MERCHANTS`: a test checks that each is advised exactly
+   like its chain (category, flags, points, offers), so change them together.
 4. **Citi Cash Back** (citibank.com.hk): 2% on Hong Kong restaurants and hotels and on foreign currency, 1% on
    everything else including e-wallets, no cash back on bills; the MoneyHero welcome offer (25,000 Max Miles for
    HK$4,000 in 30 days) and its activation deadline (`DEFAULT_CONFIG.welcome.citi`).

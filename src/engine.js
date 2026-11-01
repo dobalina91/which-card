@@ -128,16 +128,19 @@
     { n: "Don Don Donki", a: ["don don donki", "donki", "驚安"], c: "home" },
     { n: "759 Store", a: ["759 store", "759", "阿信屋"], c: "home" },
     { n: "DS Groceries", a: ["ds groceries", "ds grocery"], c: "home" },
-    { n: "TASTE", a: ["taste", "taste x fresh"], c: "home" },
-    { n: "FUSION", a: ["fusion"], c: "home" },
+    // `g`: a store brand of a chain. It gets the chain's advice: same category, flags, points and offers (tested).
+    { n: "TASTE", a: ["taste", "taste x fresh"], c: "home", f: { moneyback: 1 }, g: "PARKnSHOP" },
+    { n: "FUSION", a: ["fusion"], c: "home", f: { moneyback: 1 }, g: "PARKnSHOP" },
     { n: "FRESH", a: ["fresh supermarket", "fresh 新鮮"], c: "home" },
     { n: "GreenPrice", a: ["greenprice", "green price"], c: "home" },
     { n: "Big C", a: ["big c"], c: "home" },
     { n: "Day Day Store", a: ["day day store"], c: "home" },
     { n: "Hong Kong Flavour", a: ["hong kong flavour"], c: "home" },
-    { n: "food le parc", a: ["food le parc"], c: "home" },
-    { n: "GREAT FOOD HALL", a: ["great food hall"], c: "home" },
-    { n: "GOURMET", a: ["gourmet supermarket"], c: "home" },
+    { n: "food le parc", a: ["food le parc"], c: "home", f: { moneyback: 1 }, g: "PARKnSHOP" },
+    { n: "GREAT FOOD HALL", a: ["great food hall"], c: "home", f: { moneyback: 1 }, g: "PARKnSHOP" },
+    { n: "GOURMET", a: ["gourmet supermarket"], c: "home", f: { moneyback: 1 }, g: "PARKnSHOP" },
+    // Not named on HSBC's list, but a PARKnSHOP store: treated like PARKnSHOP.
+    { n: "International by PARKnSHOP", a: ["international by parknshop", "international by park n shop", "parknshop international"], c: "home", f: { moneyback: 1 }, g: "PARKnSHOP" },
     { n: "$mart", a: ["$mart", "smart supermarket"], c: "home" },
     { n: "Japan Home Centre (JHC)", a: ["jhc", "japan home centre", "japan home"], c: "home" },
     { n: "at.home", a: ["at.home", "at home"], c: "home" },
@@ -164,8 +167,8 @@
     { n: "Sasa", a: ["sasa", "莎莎"], c: "shopping" },
     // Other everyday places
     { n: "Wellcome", a: ["wellcome", "惠康"], c: "grocery" },
-    { n: "Market Place", a: ["market place", "marketplace", "jasons", "3hreesixty"], c: "grocery" },
-    { n: "Oliver's", a: ["oliver's", "olivers", "oliver's the delicatessen"], c: "grocery" },
+    { n: "Market Place", a: ["market place", "marketplace", "jasons", "3hreesixty"], c: "grocery", g: "Wellcome" },
+    { n: "Oliver's", a: ["oliver's", "olivers", "oliver's the delicatessen"], c: "grocery", g: "Wellcome" },
     { n: "7-Eleven", a: ["7-eleven", "7 eleven", "7eleven", "711"], c: "grocery" },
     { n: "Circle K", a: ["circle k", "ok便利店"], c: "grocery" },
     { n: "Mannings", a: ["mannings", "萬寧"], c: "retail" },
@@ -270,7 +273,7 @@
   // (an estimate for airline miles); `min` = the least needed for that use (null when unknown). `use` says how.
   // `at` = places where the balance can be spent: the page suggests it there, before the card, when it is enough.
   // Balances live in the private store, never in these files.
-  const MONEYBACK_SHOPS = ["PARKnSHOP", "Fortress", "Watsons", "TASTE", "FUSION", "GREAT FOOD HALL", "food le parc", "PNS eShop", "Fortress eShop", "Watson's Wine"];
+  const MONEYBACK_SHOPS = ["PARKnSHOP", "Fortress", "Watsons", "TASTE", "FUSION", "GREAT FOOD HALL", "food le parc", "GOURMET", "International by PARKnSHOP", "PNS eShop", "Fortress eShop", "Watson's Wine"];
   const PROGRAMS = {
     moneyback: { name: "MoneyBack", useName: "MoneyBack points", kind: "shop", perHkd: 50, min: 50, use: "Pay with points at the till (50 points = HK$1).", at: MONEYBACK_SHOPS.concat(["3 Hong Kong"]) },
     // yuu: 1 point per HK$1 at its partners when the app is scanned, so 0.5% back (`earn`).
@@ -573,8 +576,11 @@
     return hits.sort((x, y) => y.score - x.score).slice(0, 6);
   }
   function promosFor(name, cardId, extra) {
-    const q = norm(name);
+    let q = norm(name);
     if (!q) return [];
+    // A chain's store brands (`g` in MERCHANTS) get the chain's offers too.
+    const brand = MERCHANTS.find((m) => m.g && norm(m.n) === q);
+    if (brand) q += " " + norm(brand.g);
     const kind = CARDS[cardId] ? CARDS[cardId].kind : "";
     return PROMOS.concat(extra || []).filter((p) => (p.m || []).some((k) => q.includes(norm(k))))
       .map((p) => Object.assign({}, p, { onPick: p.card === kind }));
@@ -945,7 +951,7 @@
   const EXCEPTIONS = [
     { key: "online", cat: "online_hk", label: "Online shopping" },
     { key: "red8", cat: "red8_dining", label: "Sushiro, TamJai, other Red partners" },
-    { key: "pns", cat: "home", flags: { moneyback: 1 }, label: "PARKnSHOP, Fortress" },
+    { key: "pns", cat: "home", flags: { moneyback: 1 }, label: "PARKnSHOP (TASTE, FUSION…), Fortress" },
     { key: "home", cat: "home", label: "DS Groceries, other Home shops" },
     { key: "watsons", cat: "shopping", flags: { moneyback: 1 }, label: "Watsons" },
     { key: "dining", cat: "dining", label: "Restaurants" },
