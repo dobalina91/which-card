@@ -775,6 +775,7 @@
     return {
       red, hsm, rh, wel, tgm, tgx,
       rentN: 0, // rent payments to Rently so far
+      spendKnown: true, // false on the partner's page, which has no spending
       redUse: (acct, m) => (red[acct] && red[acct][m]) || { online: 0, red8: 0 },
       hsMonth: (card, m) => (hsm[card] && hsm[card][m]) || { spend: 0, extra: 0 },
       redHotYtd: (p, y) => (rh[p] && rh[p][y]) || 0,
@@ -893,7 +894,8 @@
       const done = st.welcome(W.id);
       const remaining = W.target - done;
       const daysLeft = dnum(W.end) - dnum(date) + 1;
-      const behind = remaining > 0.8 * daysLeft * (cfg.dailySpend || 200);
+      // Without spending data (the partner's page) progress is unknown: never "behind", so only a small gap moves the pick.
+      const behind = st.spendKnown !== false && remaining > 0.8 * daysLeft * (cfg.dailySpend || 200);
       if (w) {
         const gap = pick.net - w.net;
         if (pick.id === W.id) mode = "welcome";

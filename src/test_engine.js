@@ -64,6 +64,15 @@ check("Wellcome -> Citi", r.pick.id, "citi");
 const behindTx = [T({ date: "2026-10-21", card: "citi", category: "dining", amount: 1000 })];
 r = rec(citiOn, { date: "2026-11-12", catId: "home", amount: 600, flags: { moneyback: 1 } }, behindTx);
 check("Behind schedule: PARKnSHOP -> Citi", r.pick.id, "citi");
+// The partner's page has no spending, so no welcome bonus is behind schedule there: the Citi is pushed only when close to the best card.
+const noSpend = Object.assign(E.audit([], citiOn).state, { spendKnown: false });
+const onlineFx = { date: "2026-11-12", payer: "a", flags: {}, catId: "online_fx", amount: 300 };
+r = rec(citiOn, onlineFx);
+check("Behind schedule: online in foreign currency -> Citi", r.pick.id, "citi");
+r = E.recommend(onlineFx, noSpend, citiOn);
+check("Partner's page (no spending): online in foreign currency -> Red", r.pick.id + " " + r.mode, "red_a best");
+r = E.recommend(Object.assign({}, onlineFx, { catId: "dining", amount: 400 }), noSpend, citiOn);
+check("...while a restaurant still goes on the Citi for its bonus", r.pick.id + " " + r.mode, "citi welcome");
 r = rec(citiOn, { payer: "b", date: "2026-10-25", catId: "grocery", amount: 300 });
 check("B Wellcome with supplementary -> Citi", r.pick.id, "citi");
 r = rec(citiOn, { date: "2026-10-25", catId: "ewallet", amount: 1000 });

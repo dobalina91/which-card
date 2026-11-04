@@ -127,6 +127,8 @@
     if (SOLO) {
       // The solo page sees no spending: a welcome bonus already reached is marked done at build time.
       for (const id of EMBED.welcomeDone || []) S.status.state.wel[id] = Number.MAX_SAFE_INTEGER;
+      // Nor can it tell whether one is behind schedule: the card is then pushed only when close to the best one.
+      S.status.state.spendKnown = false;
       renderAskBody();
       return;
     }

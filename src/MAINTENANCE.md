@@ -59,7 +59,7 @@ The partner's page cannot read the store. When a card changes (approved, issued,
 - `cards.citi` (`status`, `approvedOn`, `suppCard`)
 - `redHot.b`, `moneybackVip.b`, `travelPlus.promoEnd` when it differs from the engine's default
 
-`welcomeDone` lists welcome bonuses already reached (e.g. `["citi"]`), so the partner's page stops pushing them.
+`welcomeDone` lists welcome bonuses already reached (e.g. `["citi"]`), so the partner's page stops pushing them. Until then, having no spending, that page never counts a bonus as behind schedule (`spendKnown: false` in `app.js`): it pushes the card only when it is within 1.5 points of the best one.
 Set `builtOn` to the day of the check. Then refresh the sealed extras (names, Signal and HeyMax links, balances the
 partner may use: `points` docs whose `users` include `"b"`, and the confirmed Max Miles): export the store,
 `snapshot.js`, `seal.js`, delete the export and `private.json`.
