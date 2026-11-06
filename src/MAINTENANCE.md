@@ -140,6 +140,8 @@ confirm the change; otherwise report it as "to watch". Add or adjust a test for 
 13. **HSBC Travel Guru** (redhotoffers.hsbc.com.hk, Travel Guru): extra RewardCash in shops abroad (GO 3%, GING 4%,
     GURU 6%; caps $500, $1,200, $2,200) once HK$8,000 is spent within 3 consecutive months; offer period to
     `travelGuruEnd` (31 Dec 2026). Members per person in `config/main.travelGuru`.
+14. **PayMe top-ups** (payme.hsbc.com.hk): free with an HSBC credit card, up to HK$5,000 a month; other cards pay
+    PayMe 1.2%, up to HK$1,000 a month (`CATS.payme`). Like every top-up, they never count toward a welcome offer.
 
 After the check, sync the partner's settings (above), set `builtOn`, test, build and publish both pages, even when no
 rule changed (the date on the partner's page shows the check happened).

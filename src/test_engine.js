@@ -76,7 +76,17 @@ check("...while a restaurant still goes on the Citi for its bonus", r.pick.id + 
 r = rec(citiOn, { payer: "b", date: "2026-10-25", catId: "grocery", amount: 300 });
 check("B Wellcome with supplementary -> Citi", r.pick.id, "citi");
 r = rec(citiOn, { date: "2026-10-25", catId: "ewallet", amount: 1000 });
-check("PayMe top-up -> Citi 1%", r.pick.id + " " + E.pct(r.pick.net), "citi 1%");
+check("AlipayHK top-up -> Citi 1%", r.pick.id + " " + E.pct(r.pick.net), "citi 1%");
+// PayMe top-ups: free with an HSBC card; any other card pays PayMe 1.2%, which the Citi's 1% doesn't cover.
+r = rec(citiOn, { date: "2026-11-06", catId: "payme", amount: 200 });
+check("PayMe top-up -> an HSBC card, free", /^(red|easy)_a$/.test(r.pick.id) + " " + String(+r.pick.net.toFixed(4)), "true 0");
+r = rec(citiOn, { payer: "b", date: "2026-11-06", catId: "payme", amount: 200 });
+check("B PayMe top-up -> B's HSBC card, not the supplementary Citi", /^(red|easy)_b$/.test(r.pick.id), true);
+const paymeNet = (card) => +E.rateFor(card, "payme", { payer: "a", date: "2026-11-06", amount: 1000, flags: {}, cfg: citiOn, st: E.audit([], citiOn).state }).net.toFixed(4);
+check("PayMe top-up on the Citi: 1% minus 1.2%", paymeNet("citi"), -0.002);
+check("PayMe top-up on the Travel+: nothing, minus 1.2%", paymeNet("hs_a"), -0.012);
+check("A PayMe top-up doesn't count toward the Citi welcome offer", E.audit([T({ date: "2026-11-06", card: "citi", category: "payme", amount: 1000 })], citiOn).state.welcome("citi"), 0);
+check("'payme' finds the PayMe top-up", E.matchMerchants("payme", [])[0].cat, "payme");
 
 // Red cap nearly used: HK$9,500 online already this month.
 const capTx = [T({ date: "2026-11-22", card: "red_a", category: "online_hk", amount: 9500 })];
