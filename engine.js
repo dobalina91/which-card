@@ -81,7 +81,10 @@
     // (1.5%, or 1.3% with a Hang Seng card; 1% from the AlipayHK balance or a linked bank account). Rates of July 2026.
     taobao:        { label: "Taobao or Tmall, paid through AlipayHK", group: "online", wallet: 1, siteFee: 0.015, siteFeeHs: 0.013 },
     telecom:       { label: "Phone or internet bill", group: "bills", redhot: "home", telecom: 1 },
-    ewallet:       { label: "PayMe, AlipayHK or WeChat Pay top-up", group: "topup", topup: 1 },
+    // PayMe top-ups (November 2026): free with an HSBC credit card, up to HK$5,000 a month; any other card pays PayMe
+    // 1.2%, up to HK$1,000 a month. The Citi's 1% doesn't cover that fee, and no top-up counts toward a welcome offer.
+    payme:         { label: "PayMe top-up", group: "topup", topup: 1, ew: 1, nonHsbcFee: 0.012 },
+    ewallet:       { label: "AlipayHK or WeChat Pay top-up", group: "topup", topup: 1, ew: 1 },
     octopus:       { label: "Octopus top-up", group: "topup", topup: 1 },
     bills:         { label: "Utilities, tax or insurance", group: "bills", bill: 1 },
     rent:          { label: "Rent", group: "bills", rent: 1 },
@@ -226,7 +229,7 @@
     { n: "GO Voyages", a: ["go voyages", "govoyages"], c: "online_fx_hkd", f: { flight: 1, netFees: 1 } },
     { n: "Amazon", a: ["amazon"], c: "online_fx" },
     // Top-ups and bills
-    { n: "PayMe top-up", a: ["payme"], c: "ewallet" },
+    { n: "PayMe top-up", a: ["payme"], c: "payme" },
     { n: "AlipayHK top-up", a: ["alipayhk", "alipay", "支付寶"], c: "ewallet" },
     { n: "WeChat Pay HK top-up", a: ["wechat pay", "wechatpay", "微信支付"], c: "ewallet" },
     { n: "Octopus top-up", a: ["octopus", "八達通"], c: "octopus" },
@@ -638,7 +641,7 @@
     switch (def.kind) {
       case "red": {
         const u = st.redUse(cardId, ym(date));
-        if (catId === "ewallet") { why.push("Red earns nothing on e-wallet top-ups"); }
+        if (cat.ew) { why.push("Red earns nothing on e-wallet top-ups"); }
         else if (cat.wallet) { why.push("Red earns nothing on purchases paid through AlipayHK, WeChat Pay or PayMe"); }
         else if (cat.bill || cat.rent || catId === "octopus" || cat.telecom) { rebate = 0.004; why.push("Bills and top-ups earn the basic 0.4% on Red"); }
         else if (cat.red8) {
@@ -661,7 +664,7 @@
       }
       case "easy": {
         const p = def.holder;
-        if (catId === "ewallet") { why.push("No RewardCash on e-wallet top-ups"); break; }
+        if (cat.ew) { why.push("No RewardCash on e-wallet top-ups"); break; }
         rebate = 0.004;
         if (redHotApplies(p, cat, cfg, date)) {
           const left = Math.max(0, 100000 - st.redHotYtd(p, yr(date)));
@@ -694,7 +697,8 @@
       }
       case "hs": {
         const c = cfg.cards[cardId] || {};
-        rebate = (catId === "ewallet" || cat.bill || cat.rent) ? 0 : 0.004;
+        if (cat.ew) { why.push("No +FUN Dollars on e-wallet top-ups"); break; }
+        rebate = (cat.bill || cat.rent) ? 0 : 0.004;
         const bonus = hsBonus(cat);
         const promo = !!c.funRegistered && date <= cfg.travelPlus.promoEnd;
         const mo = st.hsMonth(cardId, ym(date));
@@ -739,6 +743,15 @@
       const f = def.kind === "hs" && cat.siteFeeHs ? cat.siteFeeHs : cat.siteFee;
       fee += f;
       why.push("Minus " + pct(f) + ": Taobao's fee when a card pays through AlipayHK");
+    }
+    // PayMe's fee on top-ups from non-HSBC cards; HSBC cards top up free.
+    if (cat.nonHsbcFee && ["easy", "red", "citi", "hs", "debit"].includes(def.kind)) {
+      if (def.kind === "easy" || def.kind === "red") why.push("Free with an HSBC card, up to HK$5,000 a month");
+      else {
+        fee += cat.nonHsbcFee;
+        why.push("Minus " + pct(cat.nonHsbcFee) + ": PayMe's fee for non-HSBC cards, which can top up HK$1,000 a month at most");
+        if (def.kind === "citi" || def.kind === "hs") why.push("Top-ups don't count toward the welcome offer");
+      }
     }
     // A fee the website adds at checkout for this card's network (e.g. flight agencies charging more for Mastercard),
     // entered by the person from the payment page: flags.netFee = { mastercard: HK$, visa: HK$ }.

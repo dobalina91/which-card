@@ -45,7 +45,7 @@
   const CAT_SHORT = {
     dining: "Restaurant or bar", dining_hotel: "Hotel restaurant", grocery: "Supermarket", retail: "Shop", taxi: "Taxi",
     hotel_hk: "Hotel stay", online_hk: "Online, HK site", online_fx_hkd: "Online, overseas site (HKD)", online_fx: "Online, foreign currency", wallet_buy: "Paid via AlipayHK or WeChat Pay",
-    ewallet: "PayMe or AlipayHK top-up", octopus: "Octopus top-up", bills: "Bill", taobao: "Taobao via AlipayHK",
+    payme: "PayMe top-up", ewallet: "AlipayHK or WeChat Pay top-up", octopus: "Octopus top-up", bills: "Bill", taobao: "Taobao via AlipayHK",
   };
   // Kinds of place offered when a name isn't in the list (Taobao is a shop, not a kind of place).
   const PICK_CATS = Object.keys(CAT_SHORT).filter((c) => c !== "taobao");
@@ -61,7 +61,8 @@
     { label: "Flights, Booking, Agoda", cat: "online_fx_hkd" },
     { label: "Taxi", cat: "taxi" },
     { label: "Tram (Ding Ding)", cat: "tram" },
-    { label: "PayMe or AlipayHK top-up", cat: "ewallet" },
+    { label: "PayMe top-up", cat: "payme" },
+    { label: "AlipayHK top-up", cat: "ewallet" },
     { label: "Shops in Japan, Thailand, China", cat: "abroad_asia7" },
     { label: "Shops in France or Europe", cat: "abroad_eea" },
   ];
@@ -529,7 +530,8 @@
       "online_fx_hkd = website or app of an overseas company that charges Hong Kong dollars (airlines, Booking.com, Agoda, Uber, Netflix)",
       "online_fx = website charging in a foreign currency",
       "wallet_buy = buying from a shop or app through AlipayHK, WeChat Pay or PayMe (Pinduoduo, for example)",
-      "ewallet = topping up PayMe, AlipayHK or WeChat Pay",
+      "payme = topping up PayMe",
+      "ewallet = topping up AlipayHK or WeChat Pay",
       "octopus = topping up an Octopus card",
       "bills = utilities, tax, insurance or government payments",
       "telecom = mobile phone, broadband or pay-TV bill",
