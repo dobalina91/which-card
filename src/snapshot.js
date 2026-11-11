@@ -1,6 +1,7 @@
 // Builds the stand-alone page's private extras from an export of the store. The output is never committed:
 //   node snapshot.js <store-export-dir> > <scratch>/private.json && node seal.js <scratch>/private.json, then delete it.
-// <store-export-dir> holds config/main.json, txns/*.json and points/*.json (ArtifactData "list" with out_dir).
+// <store-export-dir> holds config/main.json, txns/*.json and points/*.json. Only the rent payments and the transactions
+// with claimedMiles count here (Max Miles), and only the points docs the partner may use: export just those.
 // It carries the names, the Ask link, the HeyMax links, the balances the partner may use (points docs whose `users`
 // include "b") and the confirmed Max Miles (FlyAnywhere can pay back anyone's ticket).
 const fs = require("fs");

@@ -25,10 +25,19 @@ function open(sealed) {
   d.setAuthTag(all.subarray(all.length - 16));
   return Buffer.concat([d.update(all.subarray(0, all.length - 16)), d.final()]).toString("utf8");
 }
+// Compares the extras whatever the order of their keys (the store may list fields in another order).
+const canon = (v) => (v && typeof v === "object"
+  ? (Array.isArray(v) ? "[" + v.map(canon).join(",") + "]"
+    : "{" + Object.keys(v).sort().map((k) => JSON.stringify(k) + ":" + canon(v[k])).join(",") + "}")
+  : JSON.stringify(v));
 if (fs.existsSync(target)) {
-  let same = false;
-  try { same = open(JSON.parse(fs.readFileSync(target, "utf8"))) === payload; } catch (e) { same = false; }
-  if (same) { console.log("sealed.json unchanged: same code and extras"); process.exit(0); }
+  let prev = null;
+  try { prev = JSON.parse(open(JSON.parse(fs.readFileSync(target, "utf8")))); } catch (e) { prev = null; }
+  const now = JSON.parse(payload);
+  if (prev && canon(prev) === canon(now)) { console.log("sealed.json unchanged: same code and extras"); process.exit(0); }
+  // Normally only miles (and points) change. Links, ask or people changing when the store didn't means a copying slip.
+  if (prev) console.log("Changed:", Object.keys(now).filter((k) => canon(prev[k]) !== canon(now[k])).join(", "));
+  else console.log("The current sealed.json doesn't open with this code: all the extras are new");
 }
 const salt = crypto.randomBytes(16);
 const iv = crypto.randomBytes(12);

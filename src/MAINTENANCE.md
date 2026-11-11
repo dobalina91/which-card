@@ -28,7 +28,7 @@ those extras.
 | `test_engine.js` | Scenario tests for the rules: `node test_engine.js` must pass before any publish. |
 | `build.js` | Builds `dist/index.html` (main page) and the partner's site (`dist-site/`, or `SITE_OUT=<folder>`). |
 | `site.json` | The partner's card states (`cfg`), `builtOn` (date the rules were last checked), `welcomeDone`. |
-| `snapshot.js` | `node snapshot.js <store export> > <scratch>/private.json` builds the partner page's extras from an export of the store (`config/main`, `txns`, `points`, made with ArtifactData `list` and `out_dir`). Keep both outside the repository. |
+| `snapshot.js` | `node snapshot.js <store export> > <scratch>/private.json` builds the partner page's extras from a small export of the store (`config/main`, the rent and `claimedMiles` transactions, the partner's `points`: see "Keeping the partner's page in step"). Keep both outside the repository. |
 | `seal.js`, `sealed.json` | `node seal.js <scratch>/private.json` writes `sealed.json`, only when the code or the extras changed. Delete `private.json` afterwards. |
 | `sw.js` | The partner page's offline service worker (its cache name changes with every build). |
 | `assets/` | Icons and the card pictures (HSBC Red and easy, Citi Cash Back) published next to both pages. |
@@ -44,8 +44,8 @@ cd .. && git add -A && git commit -m "…" && git push origin main
 cd ../which-card-site && git add -A && git commit -m "Site: …" && git push origin gh-pages
 ```
 
-Then publish the main page with the Artifact tool: read the artifact first (`action: "read"`), then publish
-`src/dist/index.html` to that same `url`. The card pictures already published with it (`cards/`) are kept.
+Then publish the main page: get the artifact's current version (no need to read the whole page), then publish
+`src/dist/index.html` to it as `index.html`. The card pictures already published with it (`cards/`) are kept.
 
 Check the site serves the new version: fetch `<site address>/config.js?v=<anything>` with WebFetch (the shell can't
 reach github.io) and look for the new `builtOn`.
@@ -53,7 +53,7 @@ reach github.io) and look for the new `builtOn`.
 ## Keeping the partner's page in step
 
 The partner's page cannot read the store. When a card changes (approved, issued, registered), copy these fields from
-`config/main` (ArtifactData `get`, collection `config`, doc `main`) into `site.json` → `cfg`:
+`config/main` (the store's settings document) into `site.json` → `cfg`:
 
 - `cards.red_b`, `cards.easy_b`, `cards.hs_b` (status and dates, `funRegistered`)
 - `cards.citi` (`status`, `approvedOn`, `suppCard`)
@@ -61,8 +61,14 @@ The partner's page cannot read the store. When a card changes (approved, issued,
 
 `welcomeDone` lists welcome bonuses already reached (e.g. `["citi"]`), so the partner's page stops pushing them. Until then, having no spending, that page never counts a bonus as behind schedule (`spendKnown: false` in `app.js`): it pushes the card only when it is within 1.5 points of the best one.
 Set `builtOn` to the day of the check. Then refresh the sealed extras (names, Signal and HeyMax links, balances the
-partner may use: `points` docs whose `users` include `"b"`, and the confirmed Max Miles): export the store,
-`snapshot.js`, `seal.js`, delete the export and `private.json`.
+partner may use: `points` docs whose `users` include `"b"`, and the confirmed Max Miles). `snapshot.js` needs only a
+small part of the store, so never export every transaction. In a scratch folder outside the repository, write
+`config/main.json` (the `config/main` document, copied exactly), `txns/<id>.json` for the rent payments (`category`
+`"rent"`) and for any transaction with `claimedMiles` above 0, and `points/<id>.json` only for the `points` docs whose
+`users` include `"b"`. Then, in `src/`: `TODAY=<today in Hong Kong> node snapshot.js <folder> > <scratch>/private.json`
+and `node seal.js <scratch>/private.json`. `seal.js` says which parts changed: normally `miles`, sometimes `points`. If
+it lists `links`, `ask` or `people`, compare the copy of `config/main` with the store: a real change is fine, a copying
+slip is not. Delete the folder and `private.json` afterwards.
 
 ## Points and miles
 
