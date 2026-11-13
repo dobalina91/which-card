@@ -3,13 +3,47 @@
   "builtOn": "2026-11-01",
   "cfg": {
     "cards": {
-      "red_b": { "status": "active", "since": "2026-10-12" },
-      "easy_b": { "status": "active" },
-      "citi": { "status": "active", "approvedOn": "2026-10-26", "suppCard": true },
-      "hs_b": { "status": "planned", "issuedOn": "", "funRegistered": false }
+      "red_b": {
+        "status": "active",
+        "since": "2026-10-12"
+      },
+      "easy_b": {
+        "status": "active"
+      },
+      "citi": {
+        "status": "active",
+        "approvedOn": "2026-10-26",
+        "suppCard": true
+      },
+      "hs_a": {
+        "status": "active",
+        "issuedOn": "2026-11-12",
+        "funRegistered": false,
+        "suppCard": true
+      },
+      "hs_b": {
+        "status": "planned",
+        "issuedOn": "",
+        "funRegistered": false
+      }
     },
-    "redHot": { "b": { "cat": "home", "since": "2026-10-12" } },
-    "moneybackVip": { "b": false }
+    "redHot": {
+      "b": {
+        "cat": "home",
+        "since": "2026-10-12"
+      }
+    },
+    "moneybackVip": {
+      "b": false
+    },
+    "welcome": {
+      "hs_a": {
+        "target": 8000,
+        "days": 60,
+        "reward": "$1,200 +FUN Dollars",
+        "spend": "dining"
+      }
+    }
   },
   "welcomeDone": []
 }

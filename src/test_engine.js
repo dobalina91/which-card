@@ -383,5 +383,34 @@ check("match 'taxi' not tax", top("taxi"), "Taxi");
 check("match statement line for the tram", top("GPAY HONG KONG TRAMWAY95800"), "Hong Kong Tramways");
 check("match 'AlipayHK*Taobao.com'", top("SALES: AlipayHK*Taobao.com HK"), "Taobao / Tmall (AlipayHK)");
 
+// Travel+ A in B's phone wallet, with the Dining Welcome Offer (HK$8,000 at Hong Kong restaurants in 60 days).
+{
+  const hs = E.deepMerge(base, {
+    cards: { citi: { status: "active", approvedOn: "2026-09-01", suppCard: true }, hs_a: { status: "active", issuedOn: "2026-11-12", funRegistered: true, suppCard: true } },
+    welcome: { hs_a: E.DINING_HS },
+  });
+  const d = "2026-11-20";
+  check("Travel+ A usable by B from her wallet", E.usableBy("hs_a", "b", hs, d), true);
+  check("B's Travel+ is A's while hers is not issued", E.hsFor("b", hs, d), "hs_a");
+  let x = rec(hs, { date: d, payer: "b", catId: "dining", amount: 600 });
+  check("Restaurant B -> Travel+ A (dining welcome)", x.pick.id + "/" + x.mode, "hs_a/welcome");
+  x = rec(hs, { date: d, payer: "a", catId: "dining_hotel", amount: 600 });
+  check("Hotel restaurant: no dining welcome push", x.welcome, null);
+  x = rec(hs, { date: d, payer: "a", catId: "retail", amount: 600 });
+  check("Shop: no dining welcome push", x.welcome, null);
+  const tx = [
+    T({ date: "2026-11-14", payer: "b", card: "hs_a", category: "dining", amount: 1000 }),
+    T({ date: "2026-11-15", payer: "a", card: "hs_a", category: "red8_dining", amount: 500 }),
+    T({ date: "2026-11-15", payer: "a", card: "hs_a", category: "dining_hotel", amount: 900 }),
+    T({ date: "2026-11-16", payer: "a", card: "hs_a", category: "retail", amount: 700 }),
+    T({ date: "2026-11-16", payer: "a", card: "hs_a", category: "online_hk", amount: 300 }),
+  ];
+  const st = E.audit(tx, hs).state;
+  check("Dining welcome counts both people's Hong Kong restaurants only", st.welcome("hs_a"), 1500);
+  check("Hang Seng month counts all eligible spending", st.hsMonth("hs_a", "2026-11").spend, 3400);
+  check("Standard Travel+ offer still counts all spending", E.audit(tx, E.deepMerge(hs, { welcome: { hs_a: { target: 5000, reward: "$700 +FUN Dollars", spend: "all" } } })).state.welcome("hs_a"), 3400);
+  check("Without the wallet flag B can't use Travel+ A", E.usableBy("hs_a", "b", E.deepMerge(hs, { cards: { hs_a: { suppCard: false } } }), d), false);
+}
+
 console.log("\n" + (n - fails) + "/" + n + " passed");
 process.exit(fails ? 1 : 0);

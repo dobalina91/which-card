@@ -38,7 +38,7 @@
     red_a:    { bank: "HSBC", name: "Red", holder: "a", kind: "red", tone: "red", net: "mastercard" },
     red_b:    { bank: "HSBC", name: "Red", holder: "b", kind: "red", tone: "red", net: "mastercard" },
     citi:     { bank: "Citi", name: "Cash Back", holder: "a", supp: "b", kind: "citi", tone: "citi", net: "mastercard" },
-    hs_a:     { bank: "Hang Seng", name: "Travel+", holder: "a", kind: "hs", tone: "hs", net: "visa" },
+    hs_a:     { bank: "Hang Seng", name: "Travel+", holder: "a", supp: "b", kind: "hs", tone: "hs", net: "visa" },
     hs_b:     { bank: "Hang Seng", name: "Travel+", holder: "b", kind: "hs", tone: "hs", net: "visa" },
     citiplus: { bank: "Citi", name: "PLUS debit", holder: "a", kind: "debit", tone: "debit", net: "" },
     cash:     { bank: "", name: "Cash", holder: "", kind: "cash", tone: "cash" },
@@ -487,7 +487,7 @@
       red_a: { status: "active", since: "2026-10-12" },
       red_b: { status: "active", since: "2026-10-12" },
       citi: { status: "pending", approvedOn: "", suppCard: false },
-      hs_a: { status: "planned", issuedOn: "", funRegistered: false },
+      hs_a: { status: "planned", issuedOn: "", funRegistered: false, suppCard: false },
       hs_b: { status: "planned", issuedOn: "", funRegistered: false },
       citiplus: { status: "active" },
     },
@@ -496,8 +496,10 @@
     travelPlus: { promoEnd: "2026-12-31", monthTarget: 6000, extraCap: 500, monthMode: true },
     welcome: {
       citi: { target: 4000, days: 30, reward: "25,000 Max Miles (MoneyHero)", activateBy: "2026-11-30" },
-      hs_a: { target: 5000, days: 60, reward: "$700 +FUN Dollars" },
-      hs_b: { target: 5000, days: 60, reward: "$700 +FUN Dollars" },
+      // spend: "all" (eligible retail spending) or "dining" (the Dining Welcome Offer: HK$8,000 at restaurants,
+      // $1,200 +FUN Dollars for a new customer). The offer chosen lives in the private settings.
+      hs_a: { target: 5000, days: 60, reward: "$700 +FUN Dollars", spend: "all" },
+      hs_b: { target: 5000, days: 60, reward: "$700 +FUN Dollars", spend: "all" },
     },
     dailySpend: 200,
     // Each person's phone wallet, for the "default card" line ("" = generic wording).
@@ -627,6 +629,17 @@
     return (inCap * hi + (amt - inCap) * lo) / amt;
   }
   const welcomeEligible = (catId) => { const c = CATS[catId]; return !!c && !(c.topup || c.bill || c.rent || c.telecom || c.wallet); };
+  // Hang Seng's Dining Welcome Offer counts restaurants only: not those inside hotels (nor department stores, clubs,
+  // banquets and private rooms, which the page cannot tell apart), nothing online, nothing through AlipayHK, WeChat
+  // Pay or PayMe. Its terms do not say whether restaurants abroad count, so only Hong Kong ones are counted.
+  const DINING_HS = { target: 8000, days: 60, reward: "$1,200 +FUN Dollars", spend: "dining" };
+  const diningWelcome = (catId) => { const c = CATS[catId]; return welcomeEligible(catId) && !!c.dining && !c.hotel && !c.online && c.group === "hk"; };
+  const welcomeCounts = (w, catId) => (w.spend === "dining" ? diningWelcome(catId) : welcomeEligible(catId));
+  // The Travel+ a person pays with: their own once active, else the other one if it is in their phone wallet.
+  function hsFor(payer, cfg, date) {
+    const own = payer === "a" ? "hs_a" : "hs_b", other = payer === "a" ? "hs_b" : "hs_a";
+    return !usableBy(own, payer, cfg, date) && usableBy(other, payer, cfg, date) ? other : own;
+  }
 
   // One card's value for one purchase: rebate and fees as fractions of the amount, plus the reason in words.
   function rateFor(cardId, catId, ctx) {
@@ -805,7 +818,7 @@
     if (c && c.approvedOn) out.push({ id: "citi", start: c.approvedOn, end: addDays(c.approvedOn, cfg.welcome.citi.days), target: cfg.welcome.citi.target, reward: cfg.welcome.citi.reward });
     for (const id of ["hs_a", "hs_b"]) {
       const h = cfg.cards[id];
-      if (h && h.issuedOn) out.push({ id, start: h.issuedOn, end: addDays(h.issuedOn, cfg.welcome[id].days), target: cfg.welcome[id].target, reward: cfg.welcome[id].reward });
+      if (h && h.issuedOn) out.push({ id, start: h.issuedOn, end: addDays(h.issuedOn, cfg.welcome[id].days), target: cfg.welcome[id].target, reward: cfg.welcome[id].reward, spend: cfg.welcome[id].spend || "all" });
     }
     return out;
   }
@@ -851,7 +864,7 @@
       }
     }
     for (const w of windows) {
-      if (w.id === t.card && t.date >= w.start && t.date <= w.end && welcomeEligible(t.category)) st.wel[w.id] = (st.wel[w.id] || 0) + amt;
+      if (w.id === t.card && t.date >= w.start && t.date <= w.end && welcomeCounts(w, t.category)) st.wel[w.id] = (st.wel[w.id] || 0) + amt;
     }
   }
 
@@ -865,7 +878,7 @@
     return ids;
   }
   function hsMonthMode(payer, date, cfg, openW) {
-    const hs = payer === "a" ? "hs_a" : "hs_b";
+    const hs = hsFor(payer, cfg, date);
     const c = cfg.cards[hs];
     if (!usableBy(hs, payer, cfg, date) || !c.funRegistered || date > cfg.travelPlus.promoEnd || cfg.travelPlus.monthMode === false) return false;
     return !openW.some((w) => w.id !== hs);
@@ -882,7 +895,7 @@
     const openW = windows
       .filter((w) => date >= w.start && date <= w.end && st.welcome(w.id) < w.target && usableBy(w.id, payer, cfg, date))
       .sort((a, b) => (a.end < b.end ? -1 : 1));
-    const hsCard = payer === "a" ? "hs_a" : "hs_b";
+    const hsCard = hsFor(payer, cfg, date);
     const monthMode = hsMonthMode(payer, date, cfg, openW);
     const assumeHs = monthMode || openW.some((w) => w.id === hsCard);
     const ctx = { payer, date, amount, flags, cfg, st, assumeHs };
@@ -901,7 +914,7 @@
     }
 
     // A Visa fare saving beats any welcome bonus push, so those purchases stay out of it.
-    const W = welcomeEligible(catId) && !cat.visaFare ? openW[0] : null;
+    const W = !cat.visaFare ? openW.find((w) => welcomeCounts(w, catId)) || null : null;
     if (W && !(cat.abroad && pick.id === "cash")) {
       const w = opts.find((o) => o.id === W.id);
       const done = st.welcome(W.id);
@@ -916,7 +929,7 @@
         const line = hkd(remaining) + " more on " + cardLabel(W.id) + " by " + dayLabel(W.end) + " unlocks " + W.reward + ".";
         if (mode === "welcome") notes.unshift("Welcome bonus first: " + line);
         else notes.push("Welcome bonus: still " + line + " This purchase earns more elsewhere, so keep the Citi for everyday spending.");
-        if (behind) notes.push("You are behind schedule for the welcome bonus: put every purchase you can on " + cardLabel(W.id) + ".");
+        if (behind) notes.push("You are behind schedule for the welcome bonus: put every " + (W.spend === "dining" ? "restaurant bill" : "purchase") + " you can on " + cardLabel(W.id) + ".");
       }
     } else if (monthMode && cat.inPerson && !cat.abroad) {
       const h = opts.find((o) => o.id === hsCard);
@@ -1135,7 +1148,7 @@
       const done = st.welcome(w.id);
       const left = daysTo(w.end);
       const reached = done >= w.target;
-      meters.push({ key: "wel_" + w.id, kind: "threshold", card: w.id, title: "Welcome bonus", used: done, cap: w.target,
+      meters.push({ key: "wel_" + w.id, kind: "threshold", card: w.id, title: w.spend === "dining" ? "Welcome bonus (restaurants)" : "Welcome bonus", used: done, cap: w.target,
         left: Math.max(0, w.target - done), deadline: w.end, daysLeft: left + 1, reached, closed: left < 0 && !reached, unlocks: w.reward, collected: 0,
         detail: reached ? "Done. Reward: " + w.reward : (left >= 0 ? hkd(w.target - done) + " to go by " + dayLabel(w.end) + " (" + (left + 1) + " days)" : "Window closed on " + dayLabel(w.end)),
         reward: w.reward, state: reached ? "good" : (left < 0 ? "bad" : ((w.target - done) > 0.8 * (left + 1) * (cfg.dailySpend || 200) ? "warn" : "info")) });
@@ -1232,7 +1245,7 @@
   const api = {
     PEOPLE, setPeople, cardName, PROGRAMS, programsAt, earnAt, HEYMAX, heymaxFor, pointsSummary, pointsAlerts, runLabel, runVerb, pointsToUse,
     flyAnywhere, rentCredits, TRAVEL_GURU,
-    CARDS, CARD_ORDER, CATS, COUNTRIES, MERCHANTS, PROMOS, DEFAULT_CONFIG,
+    CARDS, CARD_ORDER, CATS, COUNTRIES, MERCHANTS, PROMOS, DEFAULT_CONFIG, DINING_HS, hsFor,
     mergeConfig, deepMerge, matchMerchants, promosFor, rateFor, recommend, networkGap, defaultCard, audit, status, newState,
     cardLabel, cardActive, usableBy, holds, welcomeWindows, abroadCat, norm, pct, hkd, addDays, ym, dayLabel, monthLabel,
   };
