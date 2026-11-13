@@ -35,6 +35,7 @@
     red: { src: "cards/red.webp", thumb: "cards/red-thumb.webp", shape: "landscape", w: 480, h: 302 },
     easy: { src: "cards/easy.webp", thumb: "cards/easy-thumb.webp", shape: "portrait", w: 302, h: 480 },
     citi: { src: "cards/citi.webp", thumb: "cards/citi-thumb.webp", shape: "landscape", w: 480, h: 307 },
+    hs: { src: "cards/hs.webp", thumb: "cards/hs-thumb.webp", shape: "portrait", w: 302, h: 480 },
   };
   const cardImg = (id) => CARD_IMG[(E.CARDS[id] || {}).kind] || null;
   const cardPill = (id, text) => {
@@ -743,6 +744,7 @@
       let state = STATUS_LABEL[c.status] || "Unknown";
       if (on && date) state += " since " + E.dayLabel(date);
       if (id === "citi" && on) state += c.suppCard ? " · extra card for " + (nameOf("b") || "the partner") : " · no extra card yet";
+      if (id === "hs_a" && on && c.suppCard) state += " · also in " + (nameOf("b") || "the partner") + "'s phone";
       if ((id === "hs_a" || id === "hs_b") && on) state += c.funRegistered ? " · +FUN registered" : " · register for +FUN";
       return '<div class="card-line">' + cardPill(id, cardLabel(id)) + '<span class="cl-state' + (on ? " on" : "") + '">' + esc(state) + "</span></div>";
     }).join("");
@@ -990,7 +992,9 @@
       '<fieldset><legend>Citi Cash Back</legend><div class="two"><label for="s-citi-status">Status' + statusSel("citi") + '</label><label for="s-citi-date">Approved on<input type="date" id="s-citi-date" value="' + esc(c.cards.citi.approvedOn || "") + '"></label></div>' +
       '<label class="check" for="s-citi-supp"><input type="checkbox" id="s-citi-supp"' + (c.cards.citi.suppCard ? " checked" : "") + "> " + esc(nameOf("b") || "The partner") + " has the extra (supplementary) card</label></fieldset>" +
       '<fieldset><legend>' + esc(cardLabel("hs_a")) + '</legend><div class="two"><label for="s-hs_a-status">Status' + statusSel("hs_a") + '</label><label for="s-hs_a-date">Card issued on<input type="date" id="s-hs_a-date" value="' + esc(c.cards.hs_a.issuedOn || "") + '"></label></div>' +
-      '<label class="check" for="s-hs_a-fun"><input type="checkbox" id="s-hs_a-fun"' + (c.cards.hs_a.funRegistered ? " checked" : "") + "> Registered for +FUN Dollars</label></fieldset>" +
+      '<label class="check" for="s-hs_a-fun"><input type="checkbox" id="s-hs_a-fun"' + (c.cards.hs_a.funRegistered ? " checked" : "") + "> Registered for +FUN Dollars</label>" +
+      '<label class="check" for="s-hs_a-supp"><input type="checkbox" id="s-hs_a-supp"' + (c.cards.hs_a.suppCard ? " checked" : "") + "> " + esc(nameOf("b") || "The partner") + " pays with it too (phone wallet)</label>" +
+      '<label class="check" for="s-hs_a-dining"><input type="checkbox" id="s-hs_a-dining"' + ((c.welcome.hs_a || {}).spend === "dining" ? " checked" : "") + "> Dining Welcome Offer (HK$8,000 at restaurants for $1,200 +FUN Dollars)</label></fieldset>" +
       '<fieldset><legend>' + esc(cardLabel("hs_b")) + '</legend><div class="two"><label for="s-hs_b-status">Status' + statusSel("hs_b") + '</label><label for="s-hs_b-date">Card issued on<input type="date" id="s-hs_b-date" value="' + esc(c.cards.hs_b.issuedOn || "") + '"></label></div>' +
       '<label class="check" for="s-hs_b-fun"><input type="checkbox" id="s-hs_b-fun"' + (c.cards.hs_b.funRegistered ? " checked" : "") + "> Registered for +FUN Dollars</label></fieldset>" +
       '<fieldset><legend>Red Hot Rewards 5X (HSBC easy)</legend><label for="s-rh-a">' + esc(nameOf("a") || "Person A") + rhSel("a") + '</label><label for="s-rh-b">' + esc(nameOf("b") || "Person B") + rhSel("b") + "</label>" +
@@ -1013,6 +1017,7 @@
     cards.red_b.status = v("s-red_b-status").value; cards.red_b.since = v("s-red_b-date").value || "";
     cards.citi.status = v("s-citi-status").value; cards.citi.approvedOn = v("s-citi-date").value || ""; cards.citi.suppCard = v("s-citi-supp").checked;
     for (const id of ["hs_a", "hs_b"]) { cards[id].status = v("s-" + id + "-status").value; cards[id].issuedOn = v("s-" + id + "-date").value || ""; cards[id].funRegistered = v("s-" + id + "-fun").checked; }
+    cards.hs_a.suppCard = v("s-hs_a-supp").checked;
     const redHot = {
       a: { cat: v("s-rh-a").value, since: (S.cfg.redHot.a && S.cfg.redHot.a.cat === v("s-rh-a").value && S.cfg.redHot.a.since) || S.today },
       b: { cat: v("s-rh-b").value, since: (S.cfg.redHot.b && S.cfg.redHot.b.cat === v("s-rh-b").value && S.cfg.redHot.b.since) || S.today },
@@ -1032,6 +1037,11 @@
     const monthMode = v("s-monthMode").checked;
     if (monthMode !== (S.cfg.travelPlus.monthMode !== false)) tp.monthMode = monthMode;
     if (JSON.stringify(tp) !== JSON.stringify(raw.travelPlus || {})) doc.travelPlus = tp;
+    // The Travel+ welcome offer chosen at application: only the dining one is stored (amounts in DINING_HS).
+    const wel = JSON.parse(JSON.stringify(raw.welcome || {}));
+    if (v("s-hs_a-dining").checked) wel.hs_a = Object.assign({}, wel.hs_a || {}, E.DINING_HS);
+    else delete wel.hs_a;
+    if (JSON.stringify(wel) !== JSON.stringify(raw.welcome || {})) doc.welcome = wel;
     const daily = parseInt(String(v("s-daily").value).replace(/[^0-9]/g, ""), 10) || 200;
     if (daily !== S.cfg.dailySpend) doc.dailySpend = daily;
     try {
@@ -1095,7 +1105,7 @@
       return '<div class="card-line">' + cardPill(id, cardLabel(id) + (E.CARDS[id].supp === S.who ? " (extra card)" : "")) + '<span class="cl-state' + (on ? " on" : "") + '">' + esc(state + (extra && on ? " · " + extra : "")) + "</span></div>";
     };
     const rh = (c.redHot[S.who] || {}).cat;
-    const ids = S.who === "b" ? ["easy_b", "red_b", "citi", "hs_b"] : ["easy_a", "red_a", "citi", "hs_a"];
+    const ids = S.who === "b" ? ["easy_b", "red_b", "citi"].concat(c.cards.hs_a && c.cards.hs_a.suppCard ? ["hs_a"] : [], ["hs_b"]) : ["easy_a", "red_a", "citi", "hs_a"];
     const lock = S.sealed === "locked"
       ? '<form id="unlockForm" class="form unlock" novalidate><fieldset><legend>Extras</legend><label for="u-code">Access code<input id="u-code" autocomplete="off" autocapitalize="none" autocorrect="off" spellcheck="false" enterkeyhint="go" placeholder="four words"></label>' +
         '<p class="hint" id="u-msg">Adds the Signal button and the HeyMax links. The code is in the link you were sent.</p><div><button type="submit" class="btn small">Unlock</button></div></fieldset></form>'

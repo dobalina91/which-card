@@ -16,6 +16,12 @@ window.WC_EMBED = {
     "approvedOn": "2026-10-26",
     "suppCard": true
    },
+   "hs_a": {
+    "status": "active",
+    "issuedOn": "2026-11-12",
+    "funRegistered": false,
+    "suppCard": true
+   },
    "hs_b": {
     "status": "planned",
     "issuedOn": "",
@@ -30,6 +36,14 @@ window.WC_EMBED = {
   },
   "moneybackVip": {
    "b": false
+  },
+  "welcome": {
+   "hs_a": {
+    "target": 8000,
+    "days": 60,
+    "reward": "$1,200 +FUN Dollars",
+    "spend": "dining"
+   }
   }
  },
  "welcomeDone": [],
