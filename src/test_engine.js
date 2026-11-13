@@ -412,5 +412,21 @@ check("match 'AlipayHK*Taobao.com'", top("SALES: AlipayHK*Taobao.com HK"), "Taob
   check("Without the wallet flag B can't use Travel+ A", E.usableBy("hs_a", "b", E.deepMerge(hs, { cards: { hs_a: { suppCard: false } } }), d), false);
 }
 
+// Citi bonus and Hang Seng dining bonus both open: restaurants go to the Hang Seng while the Citi is on schedule.
+{
+  const both = E.deepMerge(base, {
+    cards: { citi: { status: "active", approvedOn: "2026-11-10", suppCard: true }, hs_a: { status: "active", issuedOn: "2026-11-12", funRegistered: false, suppCard: true } },
+    welcome: { hs_a: E.DINING_HS },
+  });
+  const d = "2026-11-20";
+  const onTrack = [T({ date: "2026-11-15", card: "citi", category: "retail", amount: 1000 })];
+  let x = rec(both, { date: d, payer: "b", catId: "dining", amount: 500 }, onTrack);
+  check("Both bonuses, Citi on schedule: restaurant -> Travel+", x.pick.id + "/" + x.mode, "hs_a/welcome");
+  x = rec(both, { date: d, payer: "a", catId: "retail", amount: 500 }, onTrack);
+  check("Both bonuses: shop -> Citi", x.pick.id + "/" + x.mode, "citi/welcome");
+  x = rec(both, { date: d, payer: "a", catId: "dining", amount: 500 }, []);
+  check("Citi behind schedule: restaurant -> Citi", x.pick.id + "/" + x.mode, "citi/welcome");
+}
+
 console.log("\n" + (n - fails) + "/" + n + " passed");
 process.exit(fails ? 1 : 0);

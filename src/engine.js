@@ -914,7 +914,16 @@
     }
 
     // A Visa fare saving beats any welcome bonus push, so those purchases stay out of it.
-    const W = !cat.visaFare ? openW.find((w) => welcomeCounts(w, catId)) || null : null;
+    // Several bonuses open for this purchase: the soonest-ending first, except that a bonus counting restaurants only
+    // (Hang Seng's dining offer) takes them while the other one is on schedule, since the other counts any spending.
+    const fits = !cat.visaFare ? openW.filter((w) => welcomeCounts(w, catId)) : [];
+    const lagging = (w) => st.spendKnown !== false && (w.target - st.welcome(w.id)) > 0.8 * (dnum(w.end) - dnum(date) + 1) * (cfg.dailySpend || 200);
+    let W = fits[0] || null;
+    const narrow = fits.find((w) => w.spend === "dining");
+    if (narrow && W !== narrow && !lagging(W)) {
+      notes.push("Restaurants go to " + cardLabel(narrow.id) + ": only they count for its bonus, while the " + cardLabel(W.id) + " bonus counts everything else.");
+      W = narrow;
+    }
     if (W && !(cat.abroad && pick.id === "cash")) {
       const w = opts.find((o) => o.id === W.id);
       const done = st.welcome(W.id);
@@ -925,7 +934,8 @@
       if (w) {
         const gap = pick.net - w.net;
         if (pick.id === W.id) mode = "welcome";
-        else if (behind || gap < 0.015) { pick = w; mode = "welcome"; }
+        // The dining offer pays about 15% of the restaurant spending it needs, more than any card's gap.
+        else if (behind || gap < 0.015 || W.spend === "dining") { pick = w; mode = "welcome"; }
         const line = hkd(remaining) + " more on " + cardLabel(W.id) + " by " + dayLabel(W.end) + " unlocks " + W.reward + ".";
         if (mode === "welcome") notes.unshift("Welcome bonus first: " + line);
         else notes.push("Welcome bonus: still " + line + " This purchase earns more elsewhere, so keep the Citi for everyday spending.");
