@@ -897,7 +897,9 @@
       .sort((a, b) => (a.end < b.end ? -1 : 1));
     const hsCard = hsFor(payer, cfg, date);
     const monthMode = hsMonthMode(payer, date, cfg, openW);
-    const assumeHs = monthMode || openW.some((w) => w.id === hsCard);
+    // A welcome window that pushes all spending to the Travel+ makes its HK$6,000 month likely, so it is taken as
+    // reached. The dining offer pushes restaurants only: the month then counts as it stands.
+    const assumeHs = monthMode || openW.some((w) => w.id === hsCard && w.spend !== "dining");
     const ctx = { payer, date, amount, flags, cfg, st, assumeHs };
 
     const opts = candidates(payer, catId, cfg, date).map((id) => rateFor(id, catId, ctx));

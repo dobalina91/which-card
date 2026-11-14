@@ -18,8 +18,8 @@ window.WC_EMBED = {
    },
    "hs_a": {
     "status": "active",
-    "issuedOn": "2026-11-12",
-    "funRegistered": false,
+    "issuedOn": "2026-11-09",
+    "funRegistered": true,
     "suppCard": true
    },
    "hs_b": {
