@@ -426,6 +426,12 @@ check("match 'AlipayHK*Taobao.com'", top("SALES: AlipayHK*Taobao.com HK"), "Taob
   check("Both bonuses: shop -> Citi", x.pick.id + "/" + x.mode, "citi/welcome");
   x = rec(both, { date: d, payer: "a", catId: "dining", amount: 500 }, []);
   check("Citi behind schedule: restaurant -> Citi", x.pick.id + "/" + x.mode, "citi/welcome");
+  // Registered for +FUN: the dining offer alone doesn't assume the HK$6,000 month, so the extra 5% waits for it.
+  const reg = E.deepMerge(both, { cards: { hs_a: { funRegistered: true } } });
+  x = rec(reg, { date: d, payer: "b", catId: "dining", amount: 500 }, onTrack);
+  check("Dining offer, month not reached: Travel+ at basic 0.4%", x.pick.id + " " + E.pct(x.pick.net), "hs_a 0.4%");
+  x = rec(reg, { date: d, payer: "b", catId: "dining", amount: 500 }, onTrack.concat([T({ date: "2026-11-16", card: "hs_a", category: "retail", amount: 6000 })]));
+  check("Dining offer, HK$6,000 month reached: Travel+ at 5%", x.pick.id + " " + E.pct(x.pick.net), "hs_a 5%");
 }
 
 console.log("\n" + (n - fails) + "/" + n + " passed");

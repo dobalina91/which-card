@@ -56,6 +56,7 @@ The partner's page cannot read the store. When a card changes (approved, issued,
 `config/main` (the store's settings document) into `site.json` → `cfg`:
 
 - `cards.red_b`, `cards.easy_b`, `cards.hs_b` (status and dates, `funRegistered`)
+- `cards.hs_a` and `welcome.hs_a` while the partner pays with that card from her phone wallet (`suppCard`), and its welcome offer is the dining one
 - `cards.citi` (`status`, `approvedOn`, `suppCard`)
 - `redHot.b`, `moneybackVip.b`, `travelPlus.promoEnd` when it differs from the engine's default
 
