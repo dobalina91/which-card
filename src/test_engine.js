@@ -434,5 +434,28 @@ check("match 'AlipayHK*Taobao.com'", top("SALES: AlipayHK*Taobao.com HK"), "Taob
   check("Dining offer, HK$6,000 month reached: Travel+ at 5%", x.pick.id + " " + E.pct(x.pick.net), "hs_a 5%");
 }
 
+// Citi bonus reached, Travel+ registered: shops build the Hang Seng month until its HK$6,000, then go back to the best card.
+{
+  const cfg = E.deepMerge(base, {
+    cards: { citi: { status: "active", approvedOn: "2026-10-26", suppCard: true }, hs_a: { status: "active", issuedOn: "2026-11-09", funRegistered: true, suppCard: true } },
+    welcome: { hs_a: E.DINING_HS },
+  });
+  const d = "2026-11-20";
+  const citiDone = [T({ date: "2026-11-17", card: "citi", category: "retail", amount: 4000 })];
+  let x = rec(cfg, { date: d, payer: "a", catId: "retail", amount: 2000 }, citiDone);
+  check("Citi bonus reached, Hang Seng month not: shop -> Travel+", x.pick.id + "/" + x.mode, "hs_a/hsmonth");
+  const monthDone = citiDone.concat([T({ date: "2026-11-18", card: "hs_a", category: "retail", amount: 6000 })]);
+  x = rec(cfg, { date: d, payer: "a", catId: "retail", amount: 2000 }, monthDone);
+  check("Hang Seng month reached: shop -> Citi", x.pick.id + "/" + x.mode, "citi/best");
+  x = rec(cfg, { date: d, payer: "b", catId: "dining", amount: 500 }, monthDone);
+  check("Hang Seng month reached: restaurant still -> Travel+ at 5%", x.pick.id + " " + E.pct(x.pick.net), "hs_a 5%");
+  x = rec(cfg, { date: "2026-12-02", payer: "a", catId: "retail", amount: 2000 }, monthDone);
+  check("New month: shop -> Travel+ again", x.pick.id + "/" + x.mode, "hs_a/hsmonth");
+  const dc = E.defaultCard("a", d, E.audit(monthDone, cfg).state, cfg);
+  check("Default card once the month is reached: Citi, then Travel+ from the 1st", dc.id + " -> " + (dc.next && dc.next.id) + " from " + (dc.next && dc.next.from), "citi -> hs_a from 2026-12-01");
+  check("Immigration Department (online visa fee) -> online Hong Kong", (E.matchMerchants("Immigration Department", [])[0] || {}).cat, "online_hk");
+  check("Bills label names IRD tax", E.CATS.bills.label, "Utilities, IRD tax or insurance");
+}
+
 console.log("\n" + (n - fails) + "/" + n + " passed");
 process.exit(fails ? 1 : 0);
