@@ -86,7 +86,7 @@
     payme:         { label: "PayMe top-up", group: "topup", topup: 1, ew: 1, nonHsbcFee: 0.012 },
     ewallet:       { label: "AlipayHK or WeChat Pay top-up", group: "topup", topup: 1, ew: 1 },
     octopus:       { label: "Octopus top-up", group: "topup", topup: 1 },
-    bills:         { label: "Utilities, tax or insurance", group: "bills", bill: 1 },
+    bills:         { label: "Utilities, IRD tax or insurance", group: "bills", bill: 1 },
     rent:          { label: "Rent", group: "bills", rent: 1 },
     red8_abroad:   { label: "Red 8% partner abroad", group: "abroad", inPerson: 1, red8: 1, fx: 1, abroad: "asia7" },
     abroad_asia7:  { label: "Shop abroad: Japan, Korea, Thailand, China, Macau, Taiwan", group: "abroad", inPerson: 1, fx: 1, abroad: "asia7" },
@@ -190,6 +190,8 @@
     { n: "Deliveroo", a: ["deliveroo"], c: "online_hk" },
     { n: "Keeta", a: ["keeta"], c: "online_hk" },
     { n: "Klook", a: ["klook"], c: "online_hk" },
+    // Visa and extension-of-stay fees paid online: an online payment, so the Red's 4%.
+    { n: "Immigration Department", a: ["immigration department", "immigration", "immd", "入境事務處", "入境處"], c: "online_hk" },
     { n: "Trip.com", a: ["trip.com", "tripcom", "攜程"], c: "online_hk" },
     { n: "Cathay Pacific", a: ["cathay pacific", "cathay", "國泰"], c: "online_hk", f: { flight: 1 } },
     { n: "HK Express", a: ["hk express", "hkexpress", "香港快運"], c: "online_hk", f: { flight: 1 } },
@@ -946,10 +948,16 @@
     } else if (monthMode && cat.inPerson && !cat.abroad) {
       const h = opts.find((o) => o.id === hsCard);
       const mo = st.hsMonth(hsCard, ym(date));
-      if (h && pick.id !== hsCard && pick.net - h.net < 0.015) { pick = h; mode = "hsmonth"; }
-      if (pick.id === hsCard) {
-        mode = "hsmonth";
-        notes.push("Hang Seng month: " + hkd(mo.spend) + " of " + hkd(cfg.travelPlus.monthTarget) + " so far. Reaching it pays 5% on this month's restaurants.");
+      // Once this month's HK$6,000 is on the Travel+, its 5% on restaurants is unlocked: shops go back to the best card.
+      const reached = st.spendKnown !== false && mo.spend >= cfg.travelPlus.monthTarget;
+      if (reached) {
+        if (h && pick.id !== hsCard) notes.push("Hang Seng month reached (" + hkd(mo.spend) + "): its 5% on this month's restaurants is unlocked, so shops go back to the best card.");
+      } else {
+        if (h && pick.id !== hsCard && pick.net - h.net < 0.015) { pick = h; mode = "hsmonth"; }
+        if (pick.id === hsCard) {
+          mode = "hsmonth";
+          notes.push("Hang Seng month: " + hkd(mo.spend) + " of " + hkd(cfg.travelPlus.monthTarget) + " so far. Reaching it pays 5% on this month's restaurants.");
+        }
       }
     }
 
@@ -1021,9 +1029,15 @@
       if (mine && mine.fare === r.pick.fare && r.pick.net - mine.net < 0.002) continue;
       exceptions.push({ key: x.key, label: x.label, card: r.pick.id, net: r.pick.net, fare: r.pick.fare });
     }
-    // The next change: the day after a welcome window or the Hang Seng promo ends.
+    // The next change: the day after a welcome window or the Hang Seng promo ends, or a new Hang Seng month
+    // (once a month's HK$6,000 is reached, shops go back to the best card until the 1st).
     const ends = welcomeWindows(cfg).filter((w) => w.end >= date && w.start <= date).map((w) => addDays(w.end, 1));
-    if (cfg.travelPlus && cfg.travelPlus.promoEnd >= date) ends.push(addDays(cfg.travelPlus.promoEnd, 1));
+    if (cfg.travelPlus && cfg.travelPlus.promoEnd >= date) {
+      ends.push(addDays(cfg.travelPlus.promoEnd, 1));
+      const y = Number(date.slice(0, 4)), m = Number(date.slice(5, 7));
+      const nextMonth = m === 12 ? (y + 1) + "-01-01" : y + "-" + String(m + 1).padStart(2, "0") + "-01";
+      if (nextMonth <= cfg.travelPlus.promoEnd) ends.push(nextMonth);
+    }
     let next = null;
     for (const from of Array.from(new Set(ends)).sort()) {
       const n = pickDefault(payer, from, st, cfg);

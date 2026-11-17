@@ -46,7 +46,9 @@ window.WC_EMBED = {
    }
   }
  },
- "welcomeDone": [],
+ "welcomeDone": [
+  "citi"
+ ],
  "sealed": {
   "v": 1,
   "iter": 600000,
